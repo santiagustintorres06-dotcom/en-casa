@@ -3,7 +3,7 @@ import type { HouseholdState, ShoppingRow } from '../types/shopping.ts';
 import { isLowStock, validateProduct } from './stock.ts';
 
 // Three decimal places, shared with inventory controls. Always suggest enough to exceed the minimum.
-export const suggestedQuantity = (p: Product) => Math.min(100000 - p.quantity, Math.max(1, Math.ceil((p.minimumStock - p.quantity) * 1000 + 1) / 1000));
+export const suggestedQuantity = (p: Product) => Math.max(1, Math.min(100000 - p.quantity, Math.round((p.minimumStock - p.quantity + 1) * 1000) / 1000));
 export function shoppingRows(state: HouseholdState): ShoppingRow[] {
   return [
     ...state.products.filter(isLowStock).map(p => {
