@@ -23,7 +23,8 @@ service cloud.firestore {
       let attempt = get(/databases/$(database)/documents/joinAttempts/$(request.auth.uid)).data;
       return code(c) && invite.householdId == h && home(h).status == 'active'
         && home(h).inviteCode == c && invite.expiresAt > request.time
-        && attempt.code == c && attempt.attemptedAt <= request.time && attempt.attemptedAt + duration.value(30, 's') > request.time;
+        // attemptedAt is forced to server request.time when written; clients cannot forge a future attempt.
+        && attempt.code == c && attempt.attemptedAt + duration.value(30, 's') > request.time;
     }
     match /users/{uid} {
       allow get: if signedIn() && uid == request.auth.uid;

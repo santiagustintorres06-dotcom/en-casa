@@ -2,6 +2,9 @@ import { readFile } from 'node:fs/promises';
 import { before, after, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, getDocs, collection, updateDoc, deleteDoc, writeBatch, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { createHousehold, joinHousehold, rotateInvitation, saveSharedState } from '../src/services/households.ts';
+import { decodeState } from '../src/services/cloudState.ts';
+import { finishShopping } from '../src/services/shopping.ts';
 
 let env;
 const auth = uid => env.authenticatedContext(uid, { firebase: { sign_in_provider: 'google.com' } }).firestore();
@@ -95,3 +98,30 @@ test('owner puede expulsar y desactivar hogar; expulsado pierde acceso', async (
   await assertSucceeds(updateDoc(doc(db,'households/home'),{status:'deleted',updatedAt:serverTimestamp()}));
   await assertFails(getDoc(doc(db,'households/home/items/p_rice')));
 });
+test('servicios reales crean hogar, unen miembro y rotan invitación al expulsar', async () => {
+  const ownerDb=auth('creator'); await createHousehold(ownerDb,'creator','Creador','Casa nueva');
+  const profile=await getDoc(doc(ownerDb,'users/creator')); const id=profile.data().householdId;
+  const snapshot=await getDoc(doc(ownerDb,'households',id)); const home={...snapshot.data(),id};
+  await joinHousehold(auth('guest'),'guest','Invitado',home.inviteCode);
+  await assertSucceeds(getDocs(collection(auth('guest'),'households',id,'items')));
+  await rotateInvitation(ownerDb,home,'guest');
+  await assertFails(getDocs(collection(auth('guest'),'households',id,'items')));
+  const next=await getDoc(doc(ownerDb,'households',id));
+  if (next.data().inviteCode === home.inviteCode) throw new Error('No rotó el código');
+});
+test('compra compartida repone siete unidades una sola vez y detecta revisión vieja', async () => {
+  const db=auth('member'); const docs=await getDocs(collection(db,'households/home/items'));
+  const {state,revision}=decodeState(docs.docs.map(d => ({id:d.id,data:d.data()})));
+  const selected={...state,selections:{rice:{checked:true,quantity:7,unit:'un'}}};
+  await saveSharedState(db,'home',state,selected,revision);
+  const bought=finishShopping(selected,'purchase','now');
+  await saveSharedState(db,'home',selected,bought,revision+1);
+  const final=await getDoc(doc(db,'households/home/items/p_rice'));
+  if(final.data().quantity !== 7) throw new Error('Stock incorrecto');
+  if(finishShopping(bought,'purchase','later') !== bought) throw new Error('Se duplicó la compra');
+  let conflict=false; try {await saveSharedState(db,'home',state,selected,revision);} catch {conflict=true;}
+  if(!conflict) throw new Error('No detectó conflicto');
+});
+
+
+

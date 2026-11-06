@@ -4,10 +4,12 @@ import type { HouseholdState, ManualItem, ShoppingRow } from '../types/shopping'
 import { loadHousehold, saveHousehold } from '../services/storage';
 import { validateProduct } from '../services/stock';
 import { finishShopping, shoppingRows } from '../services/shopping';
+import { emptyHousehold } from '../services/cloudState';
+import type { InventoryPort } from '../types/inventoryPort';
 
-export function useInventory() {
+export function useInventory(port?: InventoryPort) {
   const [initial] = useState(() => {
-    try { return { ...loadHousehold(), error: '' }; }
+    try { return { ...(port ? { state: emptyHousehold(), serialized: null } : loadHousehold()), error: '' }; }
     catch (e) { return { state: { version: 2, products: [], manualItems: [], selections: {}, completedOperations: [] } as HouseholdState, serialized: null, error: e instanceof Error ? e.message : 'No pudimos leer el almacenamiento local.' }; }
   });
   const [state, setState] = useState(initial.state);
@@ -15,6 +17,7 @@ export function useInventory() {
   const current = useRef(initial.state);
   const serialized = useRef(initial.serialized);
   function commit(change: (s: HouseholdState) => HouseholdState) {
+    if (port) return port.commit(change);
     if (initial.error) return false;
     try {
       const next = change(current.current);
@@ -48,8 +51,9 @@ export function useInventory() {
       return row.source === 'manual' ? { ...s, manualItems: s.manualItems.map(p => p.id === row.id ? { ...p, ...change } : p) } : { ...s, selections: { ...s.selections, [row.id]: { checked: live.checked, quantity: live.quantity, unit: live.unit, ...change } } };
     });
   }
+  const visible = port?.state ?? state;
   return {
-    products: state.products, state, rows: shoppingRows(state), error, upsert, addManual, updateShopping,
+    products: visible.products, state: visible, rows: shoppingRows(visible), error: port?.error || error, upsert, addManual, updateShopping,
     finish: (operationId: string) => commit(s => finishShopping(s, operationId, new Date().toISOString())),
     removeManual: (id: string) => commit(s => ({ ...s, manualItems: s.manualItems.filter(p => p.id !== id) })),
     remove: (id: string) => commit(s => { const selections = { ...s.selections }; delete selections[id]; return { ...s, selections, products: s.products.filter(p => p.id !== id) }; }),
