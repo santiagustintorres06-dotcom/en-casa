@@ -17,6 +17,7 @@ import { useInventory } from "./hooks/useInventory";
 import { categories, type Product } from "./types/product";
 import { isLowStock } from "./services/stock";
 import { ProductForm } from "./components/ProductForm";
+import { ProductCatalog } from "./components/ProductCatalog";
 import { ShoppingList } from "./components/ShoppingList";
 import { HouseholdSettings } from "./components/HouseholdSettings";
 import { useHousehold, type HouseholdController } from "./hooks/useHousehold";
@@ -46,6 +47,8 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
   const [editing, setEditing] = useState<Product | "new" | null>(null);
   const [notice, setNotice] = useState("");
   const [deleting, setDeleting] = useState<Product | null>(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const canEdit = cloud.id ? cloud.ready && !cloud.pending : !cloud.loading;
   const low = inv.products.filter(isLowStock);
   const normalize = (s: string) =>
     s
@@ -156,15 +159,25 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
               </p>
             </div>
             {tab === "Inventario" && (
-              <button
-                className="primary add"
-                disabled={
-                  cloud.id ? !cloud.ready || cloud.pending : cloud.loading
-                }
-                onClick={() => setEditing("new")}
-              >
-                <Plus size={20} /> Agregar producto
-              </button>
+              <div className="inventory-actions">
+                <button
+                  className="secondary"
+                  disabled={!canEdit}
+                  onClick={() => setCatalogOpen(true)}
+                >
+                  <Package size={18} />
+                  Cargar básicos
+                </button>
+                <button
+                  className="primary add"
+                  disabled={
+                    cloud.id ? !cloud.ready || cloud.pending : cloud.loading
+                  }
+                  onClick={() => setEditing("new")}
+                >
+                  <Plus size={20} /> Agregar producto
+                </button>
+              </div>
             )}
           </div>
           {inv.error && tab !== "Ajustes del hogar" && (
@@ -434,6 +447,18 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
           )}
         </main>
       </div>
+      {catalogOpen && (
+        <ProductCatalog
+          products={inv.products}
+          busy={!canEdit}
+          onClose={() => setCatalogOpen(false)}
+          onAdd={(keys) => {
+            const ok = inv.addFromCatalog(keys);
+            if (ok) setNotice("Productos básicos agregados al inventario");
+            return ok;
+          }}
+        />
+      )}
       {editing && (
         <ProductForm
           key={editing === "new" ? "new" : editing.id}

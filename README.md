@@ -167,3 +167,15 @@ El primer ingreso real y la lectura de “Casa Familia Torres” quedaron verifi
 Si la conexión falla, aparece **Reintentar conexión** en el inventario y en Ajustes. Se conserva el error original en lugar de reemplazarlo por una espera indefinida. Ya no se muestra un inventario vacío mientras se está cargando el hogar. Las pruebas de regresión suspenden la red durante la creación y verifican que el hogar no se abra hasta recibir la confirmación; también verifican el primer snapshot del inventario.
 
 El hogar compartido nuevo puede estar vacío aunque exista un inventario local. Para llevar esos productos al hogar, usar Ajustes → **Importar datos de este navegador**, con el hogar vacío. La importación es explícita; no se borraron ni se subieron automáticamente tus productos locales.
+
+## Productos básicos sin escribir todo a mano
+
+En Inventario → **Cargar básicos** hay un catálogo de 30 productos habituales, agrupados por categoría y con búsqueda sin distinguir tildes. Jabón, desodorante, fideos y arroz aparecen preseleccionados si todavía no existen. Se pueden seleccionar otros productos o cargar todos los visibles.
+
+Cada producto nuevo comienza con cantidad **0**, unidad y mínimo sugeridos; aparece como faltante para que ajustes su stock real o lo compres. Esas unidades y mínimos son editables. La carga es una sola operación: funciona tanto en modo local como en el hogar compartido.
+
+La app detecta productos existentes por identidad de catálogo o por nombre normalizado y categoría, incluso si difiere la unidad, para no pisar un stock ya cargado. Los muestra como “Ya está en tu inventario”. Repetir la selección no duplica productos ni cambia cantidades. Si borraste un básico, podés volver a cargarlo.
+
+Prueba: abrir el catálogo, buscar “jabon”, confirmar que encuentra “Jabón”, cargar algunos básicos y recargar. Volver a abrirlo debe mostrar esos productos bloqueados y sin nuevas selecciones para los cuatro básicos ya existentes. Los tests cubren carga, faltantes automáticos, repetición, tildes/espacios, producto renombrado y claves inválidas.
+
+Verificado en Firebase real: se cargaron jabón, desodorante y fideos a Casa Familia Torres, con stock 0; el arroz existente conservó su cantidad y unidad. La carga persistió tras recargar. La prueba de sincronización entre dos cuentas/dispositivos sigue pendiente.
