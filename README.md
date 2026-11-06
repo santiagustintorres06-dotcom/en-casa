@@ -1,62 +1,147 @@
-# En casa — Inventario y lista de compras
+# En casa
 
-Inventario local sin cuentas, tarjetas ni servicios pagos. React + Vite + TypeScript + Tailwind CSS. Interfaz en español rioplatense y tema según el sistema.
+Inventario del hogar y lista de compras, con modo local sin cuentas y conexión opcional a un hogar compartido. React + Vite + TypeScript + Tailwind CSS + Firebase Auth/Firestore. No usa servidor propio ni Cloud Functions.
 
-## Ejecutar
+## Estado del proyecto
 
-Con Node.js 22.12+ y npm instalados:
+- Etapa 1: inventario CRUD, categorías, cantidades, unidades, mínimos, búsqueda y filtros.
+- Etapa 2: lista por categorías, checks, cantidades editables, manuales y reposición al terminar.
+- Etapa 3: código de Google Sign-In, hogares, invitaciones, roles, sincronización, reglas y emuladores. La conexión real queda pendiente de configurar un proyecto tuyo.
+- Etapa 4 pendiente: PWA instalable, service worker, apertura offline y cola de escrituras compartidas.
+
+El modo local sigue funcionando sin variables de entorno. No se sube el inventario local automáticamente al iniciar sesión. El modo compartido de esta etapa necesita Internet para escribir; muestra cambios optimistas mientras el servidor confirma y revierte si falla.
+
+## Ejecutar y verificar
+
+Usar Node.js 24 LTS, npm y Java 21+ (para los emuladores):
 
 ```sh
 npm ci
 npm run dev
+npm test
+npm run build
+npm run test:rules
+npm audit
 ```
 
-Abrí la URL que muestra Vite. `npm test` valida la lógica de stock; `npm run build` comprueba TypeScript y genera `dist/`. `npm run preview` sirve el build.
+`npm run preview` sirve el build. `npm run format` aplica formato al código. No se necesitan credenciales reales para los tests: usan `demo-encasa` en localhost y nunca tu base de producción. Los errores PERMISSION_DENIED que imprimen los tests negativos son esperados.
 
-## Probar el inventario
+En Windows, si Java devuelve `Unable to establish loopback connection`, usá una carpeta temporal local corta y válida y configurá `JAVA_TOOL_OPTIONS` con `-Djdk.net.unixdomain.tmpdir="RUTA_TEMPORAL" -Djava.io.tmpdir="RUTA_TEMPORAL"`. No cambies certificados, firewall ni protecciones de red para resolverlo. `FIREBASE_EMULATORS_PATH` permite elegir dónde guardar los emuladores descargados.
 
-1. Agregá Arroz, categoría Almacén, cantidad 2 kg y mínimo 1 kg.
-2. Restá uno: aparece “Stock bajo” y cuenta como faltante. El umbral es inclusivo.
-3. Tocá “Se acabó”: queda en cero. Sumá o editá la cantidad para reponerlo.
-4. Buscá “arroz”, filtrá categoría y activá “Solo faltantes”.
-5. Editá nombre, unidad y cantidades. Recargá: los datos deben seguir.
-6. Eliminá un producto con confirmación. Cancelar lo conserva.
-7. En Ajustes, exportá el JSON de respaldo.
-8. Probá un ancho de 390 px y el tema oscuro del sistema.
+## Setup de Firebase sin facturación
 
-## Alcance y almacenamiento
+1. En [Firebase Console](https://console.firebase.google.com/) creá un proyecto en **Spark**, sin vincular una cuenta de facturación ni pasar a Blaze. No hace falta activar Analytics. Si la consola ofrece opciones de pago, no las habilites: este flujo no requiere Functions, Storage ni servicios pagos.
+2. Registrá una aplicación web en Configuración del proyecto. Copiá `.env.example` a `.env.local` y completá `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` y `VITE_FIREBASE_APP_ID` con la configuración web pública que muestra Firebase. No uses claves privadas ni JSON de cuentas de servicio.
+3. Authentication → Sign-in method: habilitá **solo Google**, con tu correo de soporte. En Authorized domains dejá únicamente los dominios que usa tu aplicación en producción (incluido el authDomain) y los de desarrollo necesarios: localhost y 127.0.0.1. No agregues dominios comodín o de terceros. El navegador del iPhone debe abrir la web publicada; localhost en el iPhone apunta al propio teléfono.
+4. Creá Cloud Firestore **Standard**, elegí una región adecuada y empezá en modo producción (reglas cerradas). No actives test mode. No se necesita cargar datos manualmente.
+5. App Check → aplicación web → reCAPTCHA v3: registrá una clave pública para tus dominios y completá `VITE_RECAPTCHA_SITE_KEY`. Verificá el plan/cuota sin facturación que ofrezca el proveedor. La clave de sitio es pública; no pongas la clave secreta de reCAPTCHA en el frontend. Para desarrollar sin reCAPTCHA real, usá los emuladores indicados abajo.
+6. Publicá las reglas del repositorio en tu proyecto, antes de usar datos reales:
 
-`localStorage`, clave `encasa.household.v2`. Migra automáticamente el inventario de `encasa.inventory.v1`, conservando esa clave anterior como copia. Cada producto tiene `id` (UUID), `name` (1–80 caracteres), `category`, `quantity` (0–100000), `unit`, `minimumStock` (0–100000), `updatedAt` (ISO). Se admiten decimales. Las alertas se derivan del inventario; no hay una segunda copia de productos faltantes.
+```sh
+npx firebase login
+npx firebase deploy --only firestore:rules --project TU_PROJECT_ID
+```
 
-Carpetas: `components/` interfaz; `hooks/` operaciones; `services/` persistencia y lógica; `types/` esquema. El adaptador de almacenamiento podrá reemplazarse por uno sincronizado.
+7. En App Check habilitá **Enforce** para Firestore. Tener el SDK inicializado no activa enforcement por sí solo. Revisá métricas si las peticiones legítimas son rechazadas; no abras las reglas como solución.
+8. En Google Cloud Console → APIs & Services → Credentials, restringí la API key pública por HTTP referrer a los orígenes de producción y desarrollo que usás, y por las APIs que necesita Firebase Auth/Firestore/App Check. Probá login y sincronización después de restringirla. La protección de datos proviene de Auth + reglas + App Check; ocultar la API key no reemplaza esos controles.
+9. Reiniciá Vite o recompilá el build: las variables VITE se incorporan durante la compilación. Ajustes del hogar mostrará **Ingresar con Google** cuando todos los valores necesarios estén presentes.
+10. Probá el login en Safari/Chrome/Edge, fuera de navegadores embebidos que bloqueen popups. El flujo usa `signInWithPopup` desde un toque del usuario; los bloqueos se muestran como error. No se utiliza redirect automático para evitar los problemas de almacenamiento entre dominios de Safari.
 
-La lista de compras permite tildar productos, editar cantidades, agregar ítems manuales y terminar una compra. Login, hogar compartido, reglas de Firestore, invitaciones, manifest y service worker son etapas posteriores. No se necesita configurar Firebase ni variables de entorno ahora. No es todavía una PWA instalable ni garantiza abrir sin conexión: conserva datos locales, pero aún necesita cargar la app.
+Referencia oficial: [planes de Firebase](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans), [precios y cuotas](https://firebase.google.com/pricing), [Google Sign-In](https://firebase.google.com/docs/auth/web/google-signin), [App Check web](https://firebase.google.com/docs/app-check/web/recaptcha-provider), [enforcement](https://firebase.google.com/docs/app-check/enable-enforcement).
 
-## Seguridad de esta etapa y riesgos residuales
+### Costos y presupuesto
 
-React escapa el contenido; no se usa HTML inyectado ni se incluyen secretos. Se validan nombres, categorías, unidades y rangos numéricos. Un error al escribir almacenamiento se informa y no se confirma como guardado. Si los datos guardados son inválidos se bloquea la escritura para no pisarlos.
+Spark tiene cuotas gratuitas; este proyecto debe permanecer sin cuenta de facturación vinculada. Si se alcanza una cuota puede dejar de sincronizar hasta que se renueve. La app muestra errores de cuota. No cambiar a Blaze para resolver un error sin revisar antes las cuotas.
 
-Los datos no están cifrados: cualquier persona con acceso al perfil del navegador puede verlos. No usar para información sensible. Limpiar el navegador o usar modo privado puede perder los datos. Exportar respaldo conserva una copia; todavía no existe restauración desde la interfaz. Usar una sola pestaña para editar: se detectan cambios ya guardados desde otra pestaña y se pide recargar. No hay bloqueo transaccional entre pestañas: dos escrituras exactamente simultáneas todavía podrían entrar en conflicto. No hay autenticación, permisos ni sincronización entre dispositivos en esta etapa. La versión final requerirá HTTPS y headers del hosting. No se habilitó facturación ni se creó infraestructura externa.
+Las alertas de presupuesto de Google Cloud se configuran sobre una cuenta de facturación y **no limitan el gasto**. En este proyecto sin facturación no hace falta crear una para poner alertas. Si en el futuro elegís habilitarla: Billing → Budgets & alerts → Create budget → seleccionar proyecto, importe y avisos al 50/90/100 %, con destinatarios propios. [Documentación de presupuestos](https://cloud.google.com/billing/docs/how-to/budgets).
 
+## Probar sin cuenta de Firebase
 
-## Probar la lista de compras (etapa 2)
+En una terminal:
 
-1. Agregá Arroz con cantidad 1 kg y mínimo 1 kg. Aparece automáticamente en la lista.
-2. Cambiá la cantidad a comprar a 2,5 (o 2.5, según el navegador), salí del campo y tildalo.
-3. Agregá Jabón como ítem manual, categoría Higiene, cantidad 2 un. Debe aparecer en su categoría.
-4. Recargá y volvé a Lista: cantidades y checks se conservan.
-5. Tocá “Terminé la compra”, revisá el aviso y confirmá. Arroz queda en 3,5 kg en inventario; Jabón sigue pendiente en la lista.
-6. Comprá Jabón: se crea en inventario con cantidad 2 y mínimo 0. No se fusionan automáticamente productos del mismo nombre: un nombre igual puede representar otra marca o presentación.
-7. Probá una compra parcial: stock 0, mínimo 2, compra 0,5. Queda en 0,5 y sigue como faltante, destildado.
-8. Cancelar el diálogo no modifica el stock. Sin checks, el botón de terminar está deshabilitado.
-9. Las cantidades deben ser positivas; no se permite que una compra lleve el stock por encima de 100.000. Si ocurre, no se aplica nada de esa compra y se explica el error.
+```sh
+npm run emulators
+```
 
-La cantidad sugerida repone hasta el mínimo más una unidad, limitada por el máximo de stock. Se puede editar. Al editar un producto o ajustar su stock se limpia su selección de compra anterior para evitar aplicar una cantidad o unidad desactualizada.
+En `.env.local`, usar solamente:
 
-## Persistencia de compras
+```dotenv
+VITE_USE_FIREBASE_EMULATORS=true
+```
 
-El documento local v2 contiene `version`, `products`, `manualItems`, `selections` (por ID de producto: cantidad, unidad y check) y `completedOperations` (IDs de compras procesadas). Faltantes se calculan; no se duplican en almacenamiento. Al finalizar se escribe un único documento con stock, lista y recibo de operación juntos. Repetir el mismo ID de operación no repone dos veces. Esto es idempotencia local, todavía no sincronización distribuida.
+Después ejecutar `npm run dev`. Abrir localhost o 127.0.0.1. El modo emulador está deshabilitado en builds de producción y siempre apunta al proyecto ficticio `demo-encasa`. El emulador de Auth ofrece un proveedor Google de prueba: no ingreses credenciales reales allí. UI de los emuladores: http://127.0.0.1:4000/.
 
-Si falla la escritura, se conserva el estado anterior; no se anuncia éxito. El respaldo exportado incluye inventario, lista y operaciones. Si el almacenamiento es inválido, se bloquea su sobrescritura. La copia v1 es histórica y no se sigue actualizando: no usar una versión antigua de la app para editar datos nuevos.
+Para probar roles distintos, usar dos perfiles de navegador y dos cuentas ficticias del emulador. El modo emulador se indica en Ajustes. Quitar la variable al terminar y reiniciar Vite. No exponer los puertos del emulador a Internet. Los datos emulados son temporales si no exportás su estado.
 
-Tests: umbral inclusivo, decimales, compra parcial, manuales, pendientes, idempotencia, cambio de unidad, límites, migración, persistencia de checks, error de escritura y conflicto entre pestañas. Se verificó también el flujo real en navegador: faltante automático → cantidad decimal → compra → recarga → manual pendiente → incorporación al inventario.
+## Cómo probar cada etapa
+
+### Inventario
+
+Agregar Arroz con cantidad 2 kg y mínimo 1. Restar uno: aparece como faltante. “Se acabó” lo deja en 0. Probar búsqueda, categorías, filtro de faltantes, edición, decimales y borrado con confirmación. Recargar conserva los datos locales. Probar ancho de 390 px y tema oscuro automático.
+
+### Lista de compras
+
+1. Con Arroz en 0, abrir Lista, cambiar cantidad a comprar a 7 y salir del campo.
+2. Tildarlo: **todavía no cambia el inventario**. Tocar “Terminé la compra” y confirmar: pasa a 7.
+3. Agregar Jabón como manual en Higiene; dejarlo sin tildar y terminar otra compra. Debe seguir pendiente, incluso después de recargar.
+4. Comprar Jabón: entra al inventario con mínimo 0. No se fusionan productos del mismo nombre para no confundir marcas o presentaciones.
+5. Compra parcial (stock 0, mínimo 2, compra 0,5): queda en 0,5 y continúa como faltante, destildado.
+6. Cancelar confirmación conserva los checks; sin checks no se puede terminar. Cantidades inválidas o stock mayor de 100.000 no se guardan.
+
+### Hogar compartido
+
+1. Ingresar con Google y crear un hogar. La creación comienza vacía y no sube datos locales sin indicarlo.
+2. En Ajustes, importar el inventario local si el hogar está vacío (hasta 150 productos/ítems). Los checks se reinician; no se importan recibos de compras anteriores.
+3. Copiar el código de invitación y unirse desde otra cuenta y otro perfil/dispositivo.
+4. Modificar un producto desde un dispositivo: el otro debe recibirlo en tiempo real. Comprar siete unidades debe reflejarse una sola vez.
+5. Provocar ediciones simultáneas: una revisión antigua no debe sobrescribir el cambio de otro integrante; se pide repetir el cambio sobre la vista actualizada.
+6. Como member, comprobar que no aparecen controles de owner; los tests verifican que tampoco se pueden invocar por fuera de la UI.
+7. Como owner, renovar código, probar que el anterior no sirve, expulsar un member y comprobar que pierde acceso. La expulsión también rota el código.
+8. Exportar un respaldo antes de cerrar sesión. Logout borra los datos de esta app en ese navegador, incluido su inventario local; el hogar permanece en Firebase.
+9. Desactivar hogar bloquea a todos. **No realiza purga física**: conserva registros. Para purgar, usar la consola de Firestore y borrar subcolecciones de `items` y `members`, invitaciones y punteros correspondientes. Conservar el documento raíz `status: deleted` para impedir la reutilización del ID.
+
+## Modelo de Firestore
+
+| Ruta                                    | Campos y función                                                                                                                        |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `users/{uid}`                           | `householdId`: hogar seleccionado de esa cuenta, o vacío. Solo el propio UID; apuntar a un hogar requiere membresía posterior al batch. |
+| `households/{id}`                       | `name`, `ownerUid`, `inviteCode`, `inviteExpiresAt`, `createdAt`, `updatedAt`, `status: active/deleted`.                                |
+| `households/{id}/members/{uid}`         | `role: owner/member`, `displayName`, `joinedAt`. Roles inmutables desde el cliente.                                                     |
+| `households/{id}/items/_version`        | `kind: version`, `revision`: contador para evitar sobrescrituras concurrentes.                                                          |
+| `households/{id}/items/p_{productId}`   | `kind: product`, `id`, `name` (1–80), `category`, `quantity` (0–100000), `unit`, `minimumStock` (0–100000), `updatedAt` (ISO).          |
+| `households/{id}/items/m_{manualId}`    | `kind: manual`, `id`, `name`, `category`, `quantity` (>0), `unit`, `checked`.                                                           |
+| `households/{id}/items/s_{productId}`   | `kind: selection`, `productId`, `quantity` (>0), `unit`, `checked`. La unidad debe coincidir con el producto.                           |
+| `households/{id}/items/o_{operationId}` | `kind: operation`, `operationId`: recibo de compra aplicado.                                                                            |
+| `invites/{code}`                        | `householdId`, `expiresAt`. Código de 32 caracteres hexadecimales (128 bits) generado por CSPRNG. No permite listados.                  |
+| `joinAttempts/{uid}`                    | `code`, `attemptedAt`: un intento por UID cada 10 s; ligado al código, utilizable durante 30 s. No se puede borrar desde el cliente.    |
+
+Los ítems se guardan en una colección común con discriminador `kind` para recibir un snapshot consistente de inventario y lista. Todas las mutaciones actualizan `_version` en la misma transacción. Los faltantes se derivan con `quantity <= minimumStock`; no se guardan duplicados. La compra suma solo lo tildado, limpia sus selecciones, conserva pendientes y registra su ID. Repetir ese ID no repone otra vez.
+
+Las membresías solo se crean mediante bootstrap atómico o el flujo de invitación validado por reglas; no existe alta libre de miembros. Los códigos se guardan como capacidades de acceso, no como contraseñas. El throttle es por cuenta, no global. Ver [revisión de seguridad y límites](SECURITY.md).
+
+## Datos locales y estructura
+
+`localStorage`: clave `encasa.household.v2`, con versión, productos, ítems manuales, selecciones y recibos. Migra el inventario anterior de `encasa.inventory.v1`, conservándolo como copia histórica. No usar una versión vieja de la app para editar datos nuevos. El respaldo JSON incluye la lista. Aún no hay restauración desde la interfaz.
+
+- `components/`: formularios, inventario, lista y ajustes.
+- `hooks/`: operaciones y coordinación de sesión/sincronización.
+- `services/`: lógica pura, almacenamiento y Firebase.
+- `types/`: esquemas y puerto intercambiable de inventario.
+- `tests/`: lógica, almacenamiento, invitaciones y reglas con casos negativos.
+
+## Deploy gratuito en Firebase Hosting
+
+No se hizo un deploy real desde este proyecto. Después de configurar tu proyecto Spark:
+
+```sh
+npm ci
+npm run build
+npx firebase login
+npx firebase deploy --only hosting,firestore:rules --project TU_PROJECT_ID
+```
+
+`firebase.json` sirve `dist/`, aplica HTTPS/headers y la ruta SPA. El build debe incorporar la configuración de producción y `VITE_USE_FIREBASE_EMULATORS=false`. Verificar login, App Check y CSP en el dominio final. No publicar `.env`, credenciales de servicio ni el directorio de emuladores.
+
+Vercel puede servir el build Vite (`npm run build`, salida `dist`), pero requiere configurar allí variables, rewrite SPA y headers equivalentes a `firebase.json`. No se configuró Vercel en esta etapa.
+
+La instalación en pantalla de inicio de iPhone y como app en Windows se documentará y verificará con el manifest y el service worker de la etapa 4; esta versión todavía no promete instalación ni apertura offline.

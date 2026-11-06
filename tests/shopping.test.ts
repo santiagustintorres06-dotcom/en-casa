@@ -1,12 +1,94 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { finishShopping, shoppingRows, suggestedQuantity } from '../src/services/shopping.ts';
-import type { HouseholdState } from '../src/types/shopping.ts';
-const state = (): HouseholdState => ({ version: 2, products: [{ id: 'rice', name: 'Arroz', category: 'Almacén', unit: 'kg', quantity: 1, minimumStock: 1, updatedAt: 'before' }], manualItems: [{ id: 'soap', name: 'Jabón', category: 'Higiene', unit: 'un', quantity: 2, checked: false }], selections: {}, completedOperations: [] });
-test('deriva faltantes sin duplicarlos y sugiere superar el mínimo', () => { const s = state(); assert.equal(shoppingRows(s).length, 2); assert.equal(suggestedQuantity(s.products[0]), 1); s.products[0].quantity = 0; s.products[0].minimumStock = 2; assert.ok(suggestedQuantity(s.products[0]) > 2); });
-test('compra suma solamente lo tildado y mantiene lo pendiente', () => { const s = state(); s.selections.rice = { checked: true, quantity: 3, unit: 'kg' }; const next = finishShopping(s, 'op1', 'now'); assert.equal(next.products[0].quantity, 4); assert.equal(next.manualItems.length, 1); assert.equal(shoppingRows(next).length, 1); assert.equal(s.products[0].quantity, 1); assert.deepEqual(finishShopping(next, 'op1', 'later'), next); });
-test('manual comprado entra al inventario sin confundir productos del mismo nombre', () => { const s = state(); s.manualItems[0].checked = true; const next = finishShopping(s, 'op2', 'now'); assert.equal(next.manualItems.length, 0); assert.equal(next.products[1].quantity, 2); assert.equal(next.products[1].minimumStock, 0); assert.equal(next.products[0].quantity, 1); });
-test('compra parcial vuelve a aparecer como faltante sin quedar tildada', () => { const s = state(); s.products[0].quantity = 0; s.selections.rice = { checked: true, quantity: 0.25, unit: 'kg' }; const next = finishShopping(s, 'op', 'now'); assert.equal(shoppingRows(next)[0].checked, false); assert.equal(next.products[0].quantity, 0.25); });
-test('rechaza compra vacía, cantidades inválidas y overflow sin mutar el estado', () => { const s = state(); assert.throws(() => finishShopping(s, 'op', 'now')); for (const quantity of [0, -1, NaN, Infinity, 100000]) { s.selections.rice = { checked: true, quantity, unit: 'kg' }; assert.throws(() => finishShopping(s, 'op', 'now')); assert.equal(s.products[0].quantity, 1); } });
-test('cambiar unidad invalida una selección anterior y borrar producto elimina la fila derivada', () => { const s = state(); s.selections.rice = { checked: true, quantity: 4, unit: 'l' }; assert.equal(shoppingRows(s)[0].checked, false); s.products = []; assert.equal(shoppingRows(s).length, 1); });
-test('stock al máximo mantiene una cantidad positiva y rechaza reponer sin perder datos', () => { const s = state(); s.products[0].quantity = 100000; s.products[0].minimumStock = 100000; assert.equal(shoppingRows(s)[0].quantity, 1); s.selections.rice = { checked: true, quantity: 1, unit: 'kg' }; assert.throws(() => finishShopping(s, 'op', 'now'), /máximo/); assert.equal(s.products[0].quantity, 100000); });
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  finishShopping,
+  shoppingRows,
+  suggestedQuantity,
+} from "../src/services/shopping.ts";
+import type { HouseholdState } from "../src/types/shopping.ts";
+const state = (): HouseholdState => ({
+  version: 2,
+  products: [
+    {
+      id: "rice",
+      name: "Arroz",
+      category: "Almacén",
+      unit: "kg",
+      quantity: 1,
+      minimumStock: 1,
+      updatedAt: "before",
+    },
+  ],
+  manualItems: [
+    {
+      id: "soap",
+      name: "Jabón",
+      category: "Higiene",
+      unit: "un",
+      quantity: 2,
+      checked: false,
+    },
+  ],
+  selections: {},
+  completedOperations: [],
+});
+test("deriva faltantes sin duplicarlos y sugiere superar el mínimo", () => {
+  const s = state();
+  assert.equal(shoppingRows(s).length, 2);
+  assert.equal(suggestedQuantity(s.products[0]), 1);
+  s.products[0].quantity = 0;
+  s.products[0].minimumStock = 2;
+  assert.ok(suggestedQuantity(s.products[0]) > 2);
+});
+test("compra suma solamente lo tildado y mantiene lo pendiente", () => {
+  const s = state();
+  s.selections.rice = { checked: true, quantity: 3, unit: "kg" };
+  const next = finishShopping(s, "op1", "now");
+  assert.equal(next.products[0].quantity, 4);
+  assert.equal(next.manualItems.length, 1);
+  assert.equal(shoppingRows(next).length, 1);
+  assert.equal(s.products[0].quantity, 1);
+  assert.deepEqual(finishShopping(next, "op1", "later"), next);
+});
+test("manual comprado entra al inventario sin confundir productos del mismo nombre", () => {
+  const s = state();
+  s.manualItems[0].checked = true;
+  const next = finishShopping(s, "op2", "now");
+  assert.equal(next.manualItems.length, 0);
+  assert.equal(next.products[1].quantity, 2);
+  assert.equal(next.products[1].minimumStock, 0);
+  assert.equal(next.products[0].quantity, 1);
+});
+test("compra parcial vuelve a aparecer como faltante sin quedar tildada", () => {
+  const s = state();
+  s.products[0].quantity = 0;
+  s.selections.rice = { checked: true, quantity: 0.25, unit: "kg" };
+  const next = finishShopping(s, "op", "now");
+  assert.equal(shoppingRows(next)[0].checked, false);
+  assert.equal(next.products[0].quantity, 0.25);
+});
+test("rechaza compra vacía, cantidades inválidas y overflow sin mutar el estado", () => {
+  const s = state();
+  assert.throws(() => finishShopping(s, "op", "now"));
+  for (const quantity of [0, -1, NaN, Infinity, 100000]) {
+    s.selections.rice = { checked: true, quantity, unit: "kg" };
+    assert.throws(() => finishShopping(s, "op", "now"));
+    assert.equal(s.products[0].quantity, 1);
+  }
+});
+test("cambiar unidad invalida una selección anterior y borrar producto elimina la fila derivada", () => {
+  const s = state();
+  s.selections.rice = { checked: true, quantity: 4, unit: "l" };
+  assert.equal(shoppingRows(s)[0].checked, false);
+  s.products = [];
+  assert.equal(shoppingRows(s).length, 1);
+});
+test("stock al máximo mantiene una cantidad positiva y rechaza reponer sin perder datos", () => {
+  const s = state();
+  s.products[0].quantity = 100000;
+  s.products[0].minimumStock = 100000;
+  assert.equal(shoppingRows(s)[0].quantity, 1);
+  s.selections.rice = { checked: true, quantity: 1, unit: "kg" };
+  assert.throws(() => finishShopping(s, "op", "now"), /máximo/);
+  assert.equal(s.products[0].quantity, 100000);
+});

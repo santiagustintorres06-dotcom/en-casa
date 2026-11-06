@@ -1,10 +1,95 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { loadHousehold, saveHousehold, STATE_KEY } from '../src/services/storage.ts';
-import { finishShopping } from '../src/services/shopping.ts';
-const memory = () => { const data = new Map<string, string>(); return { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => { data.set(key, value); } }; };
-test('migra inventario sin borrarlo y persiste lista y stock juntos', () => { const storage = memory(); const legacy = JSON.stringify([{ id: 'rice', name: 'Arroz', category: 'Almacén', unit: 'kg', quantity: 1, minimumStock: 1, updatedAt: 'before' }]); storage.setItem('encasa.inventory.v1', legacy); const { state, serialized } = loadHousehold(storage); state.selections.rice = { checked: true, quantity: 2, unit: 'kg' }; const saved = saveHousehold(state, serialized, storage); const next = finishShopping(loadHousehold(storage).state, 'op', 'now'); saveHousehold(next, saved, storage); assert.equal(loadHousehold(storage).state.products[0].quantity, 3); assert.equal(storage.getItem('encasa.inventory.v1'), legacy); assert.equal(loadHousehold(storage).state.completedOperations[0], 'op'); });
-test('rechaza sobrescribir cambios de otra pestaña', () => { const storage = memory(); const a = loadHousehold(storage); const b = loadHousehold(storage); saveHousehold(a.state, a.serialized, storage); assert.throws(() => saveHousehold(b.state, b.serialized, storage), /otra pestaña/); });
-test('errores de escritura e información inválida no reemplazan el estado', () => { const storage = memory(); const initial = loadHousehold(storage); assert.throws(() => saveHousehold(initial.state, null, { ...storage, setItem: () => { throw new Error('disk full'); } })); assert.equal(storage.getItem(STATE_KEY), null); storage.setItem(STATE_KEY, '{"version":2}'); assert.throws(() => loadHousehold(storage)); });
-test('ítems manuales, cantidades y checks sobreviven a la recarga', () => { const storage = memory(); const { state } = loadHousehold(storage); state.manualItems.push({id: 'soap', name: 'Jabón', category: 'Higiene', unit: 'un', quantity: 2.5, checked: true}); saveHousehold(state, null, storage); assert.deepEqual(loadHousehold(storage).state.manualItems, state.manualItems); });
-test('rechaza cantidades manuales inválidas antes de escribir', () => { const storage = memory(); for (const quantity of [0, -1, NaN, Infinity]) { const { state } = loadHousehold(storage); state.manualItems.push({id: 'soap', name: 'Jabón', category: 'Higiene', unit: 'un', quantity, checked: true}); assert.throws(() => saveHousehold(state, null, storage)); assert.equal(storage.getItem(STATE_KEY), null); } });
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  loadHousehold,
+  saveHousehold,
+  STATE_KEY,
+} from "../src/services/storage.ts";
+import { finishShopping } from "../src/services/shopping.ts";
+const memory = () => {
+  const data = new Map<string, string>();
+  return {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      data.set(key, value);
+    },
+  };
+};
+test("migra inventario sin borrarlo y persiste lista y stock juntos", () => {
+  const storage = memory();
+  const legacy = JSON.stringify([
+    {
+      id: "rice",
+      name: "Arroz",
+      category: "Almacén",
+      unit: "kg",
+      quantity: 1,
+      minimumStock: 1,
+      updatedAt: "before",
+    },
+  ]);
+  storage.setItem("encasa.inventory.v1", legacy);
+  const { state, serialized } = loadHousehold(storage);
+  state.selections.rice = { checked: true, quantity: 2, unit: "kg" };
+  const saved = saveHousehold(state, serialized, storage);
+  const next = finishShopping(loadHousehold(storage).state, "op", "now");
+  saveHousehold(next, saved, storage);
+  assert.equal(loadHousehold(storage).state.products[0].quantity, 3);
+  assert.equal(storage.getItem("encasa.inventory.v1"), legacy);
+  assert.equal(loadHousehold(storage).state.completedOperations[0], "op");
+});
+test("rechaza sobrescribir cambios de otra pestaña", () => {
+  const storage = memory();
+  const a = loadHousehold(storage);
+  const b = loadHousehold(storage);
+  saveHousehold(a.state, a.serialized, storage);
+  assert.throws(
+    () => saveHousehold(b.state, b.serialized, storage),
+    /otra pestaña/,
+  );
+});
+test("errores de escritura e información inválida no reemplazan el estado", () => {
+  const storage = memory();
+  const initial = loadHousehold(storage);
+  assert.throws(() =>
+    saveHousehold(initial.state, null, {
+      ...storage,
+      setItem: () => {
+        throw new Error("disk full");
+      },
+    }),
+  );
+  assert.equal(storage.getItem(STATE_KEY), null);
+  storage.setItem(STATE_KEY, '{"version":2}');
+  assert.throws(() => loadHousehold(storage));
+});
+test("ítems manuales, cantidades y checks sobreviven a la recarga", () => {
+  const storage = memory();
+  const { state } = loadHousehold(storage);
+  state.manualItems.push({
+    id: "soap",
+    name: "Jabón",
+    category: "Higiene",
+    unit: "un",
+    quantity: 2.5,
+    checked: true,
+  });
+  saveHousehold(state, null, storage);
+  assert.deepEqual(loadHousehold(storage).state.manualItems, state.manualItems);
+});
+test("rechaza cantidades manuales inválidas antes de escribir", () => {
+  const storage = memory();
+  for (const quantity of [0, -1, NaN, Infinity]) {
+    const { state } = loadHousehold(storage);
+    state.manualItems.push({
+      id: "soap",
+      name: "Jabón",
+      category: "Higiene",
+      unit: "un",
+      quantity,
+      checked: true,
+    });
+    assert.throws(() => saveHousehold(state, null, storage));
+    assert.equal(storage.getItem(STATE_KEY), null);
+  }
+});
