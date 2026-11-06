@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import {
   initializeFirestore,
   memoryLocalCache,
@@ -33,7 +33,7 @@ function initialize() {
   const app = initializeApp(config);
   if (!emulatorMode)
     initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(env.VITE_RECAPTCHA_SITE_KEY),
+      provider: new ReCaptchaEnterpriseProvider(env.VITE_RECAPTCHA_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
     });
   const auth = getAuth(app);
