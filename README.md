@@ -26,6 +26,8 @@ npm audit
 
 `npm run preview` sirve el build. `npm run format` aplica formato al código. No se necesitan credenciales reales para los tests: usan `demo-encasa` en localhost y nunca tu base de producción. Los errores PERMISSION_DENIED que imprimen los tests negativos son esperados.
 
+Los tests de reglas cierran sus suscripciones; Node usa `--test-force-exit` después de completar todos los tests y hooks porque el SDK del emulador puede conservar canales gRPC residuales. No omite aserciones ni errores de tests.
+
 En Windows, si Java devuelve `Unable to establish loopback connection`, usá una carpeta temporal local corta y válida y configurá `JAVA_TOOL_OPTIONS` con `-Djdk.net.unixdomain.tmpdir="RUTA_TEMPORAL" -Djava.io.tmpdir="RUTA_TEMPORAL"`. No cambies certificados, firewall ni protecciones de red para resolverlo. `FIREBASE_EMULATORS_PATH` permite elegir dónde guardar los emuladores descargados.
 
 ## Setup de Firebase sin facturación
@@ -156,4 +158,12 @@ La instalación en pantalla de inicio de iPhone y como app en Windows se documen
 - API key limitada a seis referrers: ambos dominios HTTPS de Firebase y localhost/127.0.0.1 en los puertos 5173 y 4173. Restringida a Firestore, App Check, Installations, Identity Toolkit y Token Service. Google indica hasta cinco minutos de propagación.
 - El cliente usa `ReCaptchaEnterpriseProvider` porque la consola ya no permite nuevas configuraciones de reCAPTCHA Classic. Sin facturación, Fraud Defense usa Essentials: cuota gratuita y rechazo al excederla, sin cobros. [Condiciones y cuotas oficiales](https://docs.cloud.google.com/recaptcha/docs/billing-information).
 
-Pendiente: probar login Google y operaciones reales entre dos cuentas desde Safari/Chrome/Edge. App Check no sustituye las reglas de Firestore. No se cambiaron reglas a modo abierto ni se publicaron datos del inventario local automáticamente. No se desplegó Hosting ni se completó aún la PWA.
+El primer login Google y la lectura del hogar real quedaron verificados. Pendiente: probar operaciones entre dos cuentas desde Safari/Chrome/Edge. App Check no sustituye las reglas de Firestore. No se cambiaron reglas a modo abierto ni se publicaron datos del inventario local automáticamente. No se desplegó Hosting ni se completó aún la PWA.
+
+### Corrección de la primera conexión al hogar
+
+El primer ingreso real y la lectura de “Casa Familia Torres” quedaron verificados en el navegador. Se corrigió una carrera al crear el hogar: Firestore anuncia el puntero del usuario de forma optimista antes de confirmar las membresías del batch. La app ahora espera snapshots confirmados del servidor, escucha también cambios de metadata y espera hogar, integrantes e inventario antes de habilitar la edición. No cambió las reglas ni necesita recrear el hogar.
+
+Si la conexión falla, aparece **Reintentar conexión** en el inventario y en Ajustes. Se conserva el error original en lugar de reemplazarlo por una espera indefinida. Ya no se muestra un inventario vacío mientras se está cargando el hogar. Las pruebas de regresión suspenden la red durante la creación y verifican que el hogar no se abra hasta recibir la confirmación; también verifican el primer snapshot del inventario.
+
+El hogar compartido nuevo puede estar vacío aunque exista un inventario local. Para llevar esos productos al hogar, usar Ajustes → **Importar datos de este navegador**, con el hogar vacío. La importación es explícita; no se borraron ni se subieron automáticamente tus productos locales.

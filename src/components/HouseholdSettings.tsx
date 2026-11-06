@@ -130,9 +130,20 @@ export function HouseholdSettings({
         </div>
       )}
       {cloud.error && (
-        <p role="alert" className="error">
+        <div role="alert" className="error">
           {cloud.error}
-        </p>
+          {cloud.user && (
+            <div>
+              <button
+                className="secondary"
+                disabled={cloud.pending || cloud.loading}
+                onClick={cloud.retryConnection}
+              >
+                Reintentar conexión
+              </button>
+            </div>
+          )}
+        </div>
       )}
       {cloud.loading && (
         <p role="status" className="stage-note">
@@ -178,7 +189,7 @@ export function HouseholdSettings({
               Salir
             </button>
           </div>
-          {!cloud.id && !cloud.loading && (
+          {!cloud.id && cloud.profileReady && !cloud.loading && (
             <div className="home-setup-grid">
               <form onSubmit={create}>
                 <h3>Creá tu hogar</h3>

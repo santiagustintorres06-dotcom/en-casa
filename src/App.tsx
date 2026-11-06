@@ -88,11 +88,13 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
           {cloud.id
             ? cloud.pending
               ? "Guardando en el hogar…"
-              : !cloud.ready
-                ? "Sin acceso al hogar"
-                : !cloud.online
-                  ? "Sin conexión"
-                  : "Hogar sincronizado"
+              : cloud.loading
+                ? "Conectando con el hogar…"
+                : !cloud.ready
+                  ? "Sin acceso al hogar"
+                  : !cloud.online
+                    ? "Sin conexión"
+                    : "Hogar sincronizado"
             : "Guardado en este dispositivo"}
         </span>
       </header>
@@ -154,12 +156,18 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
               </p>
             </div>
             {tab === "Inventario" && (
-              <button className="primary add" onClick={() => setEditing("new")}>
+              <button
+                className="primary add"
+                disabled={
+                  cloud.id ? !cloud.ready || cloud.pending : cloud.loading
+                }
+                onClick={() => setEditing("new")}
+              >
                 <Plus size={20} /> Agregar producto
               </button>
             )}
           </div>
-          {inv.error && (
+          {inv.error && tab !== "Ajustes del hogar" && (
             <p role="alert" className="error">
               {inv.error}
             </p>
@@ -175,7 +183,28 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
               compartidos necesitás Internet en esta etapa.
             </p>
           )}
-          {tab === "Inventario" && (
+          {cloud.id && !cloud.ready && tab !== "Ajustes del hogar" && (
+            <section className="inventory settings" role="status">
+              <h2>
+                {cloud.loading
+                  ? "Conectando con tu hogar…"
+                  : "No pudimos abrir el hogar"}
+              </h2>
+              <p>
+                {cloud.loading
+                  ? "Estamos esperando la confirmación de Firebase. Tus datos locales siguen guardados."
+                  : "La conexión se interrumpió. Podés volver a cargar el hogar sin cerrar sesión ni borrar tus datos."}
+              </p>
+              <button
+                className="secondary"
+                disabled={cloud.loading || cloud.pending}
+                onClick={cloud.retryConnection}
+              >
+                Reintentar conexión
+              </button>
+            </section>
+          )}
+          {tab === "Inventario" && (!cloud.id || cloud.ready) && (
             <>
               <section className="stats">
                 <div>
@@ -391,7 +420,7 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
               </p>
             </>
           )}
-          {tab === "Lista de compras" && (
+          {tab === "Lista de compras" && (!cloud.id || cloud.ready) && (
             <ShoppingList
               rows={inv.rows}
               onChange={inv.updateShopping}
