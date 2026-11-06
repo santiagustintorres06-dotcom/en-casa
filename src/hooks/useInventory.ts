@@ -10,6 +10,7 @@ import { validateProduct } from "../services/stock";
 import { finishShopping, shoppingRows } from "../services/shopping";
 import { emptyHousehold } from "../services/cloudState";
 import type { InventoryPort } from "../types/inventoryPort";
+import { addCatalogProducts } from "../services/productCatalog";
 
 export function useInventory(port?: InventoryPort) {
   const [initial] = useState(() => {
@@ -175,6 +176,8 @@ export function useInventory(port?: InventoryPort) {
     rows: shoppingRows(visible),
     error: port?.error || error,
     upsert,
+    addFromCatalog: (keys: string[]) =>
+      commit((s) => addCatalogProducts(s, keys, new Date().toISOString())),
     addManual,
     updateShopping,
     finish: (operationId: string) =>
