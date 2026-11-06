@@ -27,6 +27,7 @@ import {
   rotateInvitation,
   saveSharedState,
   watchState,
+  watchUserHousehold,
   type Household,
   type HouseholdMember,
 } from "../services/households";
@@ -43,6 +44,8 @@ export function useHousehold() {
   const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [state, setState] = useState(emptyHousehold);
   const [ready, setReady] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [loading, setLoading] = useState(firebaseConfigured);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -69,16 +72,22 @@ export function useHousehold() {
       setId("");
       setHome(null);
       setReady(false);
+      setProfileReady(false);
+      setError("");
       setLoading(!!next);
     });
     return stopAuth;
   }, []);
   useEffect(() => {
     if (!runtime || !user) return;
-    const stop = onSnapshot(
-      doc(runtime.db, "users", user.uid),
-      (snapshot) => {
-        setId(snapshot.data()?.householdId ?? "");
+    setProfileReady(false);
+    setLoading(true);
+    const stop = watchUserHousehold(
+      runtime.db,
+      user.uid,
+      (householdId) => {
+        setId(householdId);
+        setProfileReady(true);
         setLoading(false);
       },
       (e) => {
@@ -88,7 +97,7 @@ export function useHousehold() {
     );
     subscriptions.current.push(stop);
     return stop;
-  }, [user]);
+  }, [user, connectionAttempt]);
   useEffect(() => {
     if (!runtime || !id || !user) {
       setHome(null);
@@ -109,6 +118,21 @@ export function useHousehold() {
     current.current = { state: emptyHousehold(), revision: -1 };
     confirmed.current = current.current;
     let denied = false;
+    let homeLoaded = false,
+      membersLoaded = false,
+      itemsLoaded = false,
+      connected = false;
+    const updateReady = () => {
+      if (denied || generation.current !== token) return;
+      if (homeLoaded && membersLoaded && itemsLoaded) {
+        setReady(true);
+        setLoading(false);
+        if (!connected) {
+          setError("");
+          connected = true;
+        }
+      }
+    };
     const fail = (e: unknown) => {
       if (generation.current !== token) return;
       denied = true;
@@ -124,8 +148,14 @@ export function useHousehold() {
     const stops = [
       onSnapshot(
         doc(db, "households", id),
+        { includeMetadataChanges: true },
         (snap) => {
-          if (denied) return;
+          if (
+            denied ||
+            snap.metadata.hasPendingWrites ||
+            snap.metadata.fromCache
+          )
+            return;
           if (!snap.exists() || snap.data().status !== "active") {
             fail(
               new Error(
@@ -135,18 +165,28 @@ export function useHousehold() {
             return;
           }
           setHome({ ...snap.data(), id } as Household);
+          homeLoaded = true;
+          updateReady();
         },
         fail,
       ),
       onSnapshot(
         collection(db, "households", id, "members"),
+        { includeMetadataChanges: true },
         (snap) => {
-          if (!denied)
-            setMembers(
-              snap.docs.map(
-                (d) => ({ ...d.data(), uid: d.id }) as HouseholdMember,
-              ),
-            );
+          if (
+            denied ||
+            snap.metadata.hasPendingWrites ||
+            snap.metadata.fromCache
+          )
+            return;
+          setMembers(
+            snap.docs.map(
+              (d) => ({ ...d.data(), uid: d.id }) as HouseholdMember,
+            ),
+          );
+          membersLoaded = true;
+          updateReady();
         },
         fail,
       ),
@@ -160,8 +200,8 @@ export function useHousehold() {
             current.current = confirmed.current;
             setState(next);
           }
-          setReady(true);
-          setLoading(false);
+          itemsLoaded = true;
+          updateReady();
         },
         fail,
       ),
@@ -173,11 +213,19 @@ export function useHousehold() {
       saving.current = false;
       setPending(false);
     };
-  }, [id, user]);
+  }, [id, user, connectionAttempt]);
 
   function commit(change: (s: HouseholdState) => HouseholdState) {
-    if (!runtime || !home || !ready || saving.current) {
-      setError("Esperá a que termine la sincronización antes de seguir.");
+    if (!runtime || !home || !ready) {
+      setError(
+        (previous) =>
+          previous ||
+          "No pudimos conectar con el hogar. Tocá Reintentar conexión para volver a cargarlo.",
+      );
+      return false;
+    }
+    if (saving.current) {
+      setError("Estamos guardando el cambio anterior. Esperá un momento.");
       return false;
     }
     if (!navigator.onLine) {
@@ -266,7 +314,7 @@ export function useHousehold() {
     ? {
         state: ready ? state : emptyHousehold(),
         error,
-        pending: pending || !ready,
+        pending: pending || loading,
         commit,
       }
     : undefined;
@@ -280,9 +328,18 @@ export function useHousehold() {
     loading,
     pending,
     ready,
+    profileReady,
     error,
     online,
     port,
+    retryConnection: () => {
+      if (!pending) {
+        setReady(false);
+        setError("");
+        setLoading(true);
+        setConnectionAttempt((value) => value + 1);
+      }
+    },
     login: () =>
       runtime
         ? action(() => signInWithPopup(runtime.auth, new GoogleAuthProvider()))

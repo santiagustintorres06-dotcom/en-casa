@@ -134,6 +134,26 @@ export async function deactivateHousehold(db: Firestore, home: Household) {
   await batch.commit();
 }
 
+// Local latency-compensated pointers can announce a household before its membership exists
+// on the server. Wait for acknowledgement (including metadata-only acknowledgements).
+export function watchUserHousehold(
+  db: Firestore,
+  uid: string,
+  next: (householdId: string) => void,
+  error: (e: Error) => void,
+) {
+  return onSnapshot(
+    doc(db, "users", uid),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache)
+        return;
+      next(snapshot.data()?.householdId ?? "");
+    },
+    error,
+  );
+}
+
 export function watchState(
   db: Firestore,
   id: string,
@@ -142,8 +162,10 @@ export function watchState(
 ) {
   return onSnapshot(
     collection(db, "households", id, "items"),
+    { includeMetadataChanges: true },
     (snapshot) => {
-      if (snapshot.metadata.hasPendingWrites) return;
+      if (snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache)
+        return;
       try {
         const decoded = decodeState(
           snapshot.docs.map((d) => ({ id: d.id, data: d.data() })),
@@ -208,7 +230,7 @@ export function cloudError(error: unknown): string {
   if (code.includes("unauthorized-domain"))
     return "Falta autorizar este dominio en Firebase Auth. Revisá el setup del README.";
   if (code.includes("permission-denied"))
-    return "No tenés permiso, venció la invitación o falta configurar App Check y las reglas de Firebase.";
+    return "Firebase rechazó el acceso al hogar. Tocá Reintentar conexión. Si persiste, hay que revisar la membresía o App Check.";
   if (code.includes("resource-exhausted"))
     return "Se alcanzó la cuota gratuita de Firebase. Esperá a que se renueve; no hace falta activar facturación.";
   if (code.includes("unavailable") || code.includes("network-request-failed"))

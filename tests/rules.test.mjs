@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import assert from "node:assert/strict";
 import { before, after, beforeEach, test } from "node:test";
 import {
   initializeTestEnvironment,
@@ -16,12 +17,18 @@ import {
   writeBatch,
   Timestamp,
   serverTimestamp,
+  onSnapshot,
+  disableNetwork,
+  enableNetwork,
+  getDocsFromServer,
 } from "firebase/firestore";
 import {
   createHousehold,
   joinHousehold,
   rotateInvitation,
   saveSharedState,
+  watchUserHousehold,
+  watchState,
 } from "../src/services/households.ts";
 import { decodeState } from "../src/services/cloudState.ts";
 import { finishShopping } from "../src/services/shopping.ts";
@@ -369,3 +376,91 @@ test("otro hogar y usuario anónimo tampoco pueden escribir stock ni perfil ajen
     setDoc(doc(auth("member"), "users/owner"), { householdId: "" }),
   );
 });
+
+test(
+  "no abre un hogar anunciado localmente hasta confirmar el batch en el servidor",
+  { timeout: 15000 },
+  async () => {
+    const db = auth("fresh-owner");
+    const seen = [];
+    let firstProfile, confirmedProfile, localWrite;
+    const first = new Promise((resolve) => {
+      firstProfile = resolve;
+    });
+    const confirmed = new Promise((resolve) => {
+      confirmedProfile = resolve;
+    });
+    const localPending = new Promise((resolve) => {
+      localWrite = resolve;
+    });
+    const stop = watchUserHousehold(
+      db,
+      "fresh-owner",
+      (id) => {
+        seen.push(id);
+        if (id) confirmedProfile(id);
+        else firstProfile();
+      },
+      (error) => {
+        throw error;
+      },
+    );
+    const stopPending = onSnapshot(
+      doc(db, "users/fresh-owner"),
+      { includeMetadataChanges: true },
+      (snap) => {
+        if (snap.metadata.hasPendingWrites && snap.data()?.householdId)
+          localWrite();
+      },
+    );
+    try {
+      await first;
+      await disableNetwork(db);
+      const creation = createHousehold(
+        db,
+        "fresh-owner",
+        "Owner",
+        "Hogar nuevo",
+      );
+      await localPending;
+      assert.deepEqual(seen, [""]);
+      await enableNetwork(db);
+      await creation;
+      const id = await confirmed;
+      const docs = await getDocsFromServer(
+        collection(db, "households", id, "items"),
+      );
+      assert.equal(docs.docs[0].data().revision, 0);
+      assert.deepEqual(seen, ["", id]);
+    } finally {
+      await enableNetwork(db);
+      stop();
+      stopPending();
+      await db.terminate();
+    }
+  },
+);
+
+test(
+  "primer snapshot del inventario compartido espera datos confirmados, sin falso error de versión",
+  { timeout: 10000 },
+  async () => {
+    const db = auth("member");
+    let stop;
+    try {
+      const result = await new Promise((resolve, reject) => {
+        stop = watchState(
+          db,
+          "home",
+          (state, revision) => resolve({ state, revision }),
+          reject,
+        );
+      });
+      assert.equal(result.revision, 0);
+      assert.equal(result.state.products[0].name, "Arroz");
+    } finally {
+      stop?.();
+      await db.terminate();
+    }
+  },
+);
