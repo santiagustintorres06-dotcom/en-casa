@@ -4,3 +4,7 @@ dist/
 .env.*
 !.env.example
 *.tsbuildinfo
+.firebase/
+*-debug.log
+firebase-debug.*.log
+.emulator-cache/

@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com'; }
+    function home(h) { return get(/databases/$(database)/documents/households/$(h)).data; }
+    function member(h) { return signedIn() && home(h).status == 'active' && exists(/databases/$(database)/documents/households/$(h)/members/$(request.auth.uid)); }
+    function owner(h) { return member(h) && get(/databases/$(database)/documents/households/$(h)/members/$(request.auth.uid)).data.role == 'owner'; }
+    function text(v, max) { return v is string && v.size() > 0 && v.size() <= max; }
+    function code(v) { return v is string && v.matches('^[a-f0-9]{32}$'); }
+    function quantity(v) { return v is number && v >= 0 && v <= 100000; }
+    function category(v) { return v in ['Almacén', 'Lácteos', 'Verdulería', 'Carnicería', 'Congelados', 'Bebidas', 'Limpieza', 'Higiene', 'Otros']; }
+    function unit(v) { return v in ['un', 'kg', 'g', 'l', 'ml', 'paquete']; }
+    function creatingOwner(h) {
+      return signedIn() && !exists(/databases/$(database)/documents/households/$(h))
+        && getAfter(/databases/$(database)/documents/households/$(h)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/households/$(h)).data.createdAt == request.time;
+    }
+    function versionAdvanced(h) {
+      return getAfter(/databases/$(database)/documents/households/$(h)/items/_version).data.revision == get(/databases/$(database)/documents/households/$(h)/items/_version).data.revision + 1;
+    }
+    function validInvite(h, c) {
+      let invite = get(/databases/$(database)/documents/invites/$(c)).data;
+      let attempt = get(/databases/$(database)/documents/joinAttempts/$(request.auth.uid)).data;
+      return code(c) && invite.householdId == h && home(h).status == 'active'
+        && home(h).inviteCode == c && invite.expiresAt > request.time
+        && attempt.code == c && attempt.attemptedAt <= request.time && attempt.attemptedAt + duration.value(30, 's') > request.time;
+    }
+    match /users/{uid} {
+      allow get: if signedIn() && uid == request.auth.uid;
+      allow create, update: if signedIn() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['householdId']) && request.resource.data.householdId is string
+        && (request.resource.data.householdId == '' || existsAfter(/databases/$(database)/documents/households/$(request.resource.data.householdId)/members/$(uid)));
+    }
+    match /joinAttempts/{uid} {
+      allow get: if signedIn() && uid == request.auth.uid;
+      allow create, update: if signedIn() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['code', 'attemptedAt']) && code(request.resource.data.code)
+        && request.resource.data.attemptedAt == request.time
+        && (!exists(/databases/$(database)/documents/joinAttempts/$(uid)) || resource.data.attemptedAt + duration.value(10, 's') <= request.time);
+    }
+    match /invites/{c} {
+      allow get: if signedIn() && (owner(resource.data.householdId) || validInvite(resource.data.householdId, c));
+      allow create: if signedIn() && code(c)
+        && request.resource.data.keys().hasOnly(['householdId', 'expiresAt'])
+        && text(request.resource.data.householdId, 80)
+        && (owner(request.resource.data.householdId) || creatingOwner(request.resource.data.householdId))
+        && getAfter(/databases/$(database)/documents/households/$(request.resource.data.householdId)).data.inviteCode == c
+        && request.resource.data.expiresAt == getAfter(/databases/$(database)/documents/households/$(request.resource.data.householdId)).data.inviteExpiresAt;
+      allow delete: if owner(resource.data.householdId);
+    }
+    match /households/{h} {
+      function validHome(d) {
+        return d.keys().hasOnly(['name', 'ownerUid', 'inviteCode', 'inviteExpiresAt', 'createdAt', 'updatedAt', 'status'])
+          && text(d.name, 80) && text(d.ownerUid, 128) && code(d.inviteCode)
+          && d.inviteExpiresAt is timestamp && d.createdAt is timestamp && d.updatedAt == request.time
+          && d.status in ['active', 'deleted'];
+      }
+      function newInvitation(d) {
+        return d.inviteExpiresAt > request.time + duration.value(47, 'h') && d.inviteExpiresAt <= request.time + duration.value(48, 'h')
+          && getAfter(/databases/$(database)/documents/invites/$(d.inviteCode)).data.householdId == h;
+      }
+      allow get: if member(h) || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn() && validHome(request.resource.data) && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.createdAt == request.time && request.resource.data.status == 'active'
+        && newInvitation(request.resource.data)
+        && getAfter(/databases/$(database)/documents/households/$(h)/members/$(request.auth.uid)).data.role == 'owner';
+      allow update: if owner(h) && validHome(request.resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid && request.resource.data.createdAt == resource.data.createdAt
+        && ((request.resource.data.inviteCode == resource.data.inviteCode && request.resource.data.inviteExpiresAt == resource.data.inviteExpiresAt) || newInvitation(request.resource.data));
+      match /members/{uid} {
+        allow read: if member(h);
+        allow create: if signedIn() && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['role', 'displayName', 'joinedAt'])
+          && text(request.resource.data.displayName, 80) && request.resource.data.joinedAt == request.time
+          && getAfter(/databases/$(database)/documents/users/$(uid)).data.householdId == h
+          && ((request.resource.data.role == 'owner' && creatingOwner(h))
+            || (request.resource.data.role == 'member' && validInvite(h, home(h).inviteCode)));
+        allow delete: if owner(h) && uid != request.auth.uid && resource.data.role == 'member';
+      }
+      match /items/{id} {
+        function validItem(d) {
+          return (d.kind == 'product' && id == 'p_' + d.id && d.keys().hasOnly(['kind', 'id', 'name', 'category', 'quantity', 'unit', 'minimumStock', 'updatedAt'])
+              && text(d.id, 100) && text(d.name, 80) && category(d.category) && quantity(d.quantity) && unit(d.unit) && quantity(d.minimumStock) && text(d.updatedAt, 40))
+            || (d.kind == 'manual' && id == 'm_' + d.id && d.keys().hasOnly(['kind', 'id', 'name', 'category', 'quantity', 'unit', 'checked'])
+              && text(d.id, 100) && text(d.name, 80) && category(d.category) && quantity(d.quantity) && d.quantity > 0 && unit(d.unit) && d.checked is bool)
+            || (d.kind == 'selection' && id == 's_' + d.productId && d.keys().hasOnly(['kind', 'productId', 'quantity', 'unit', 'checked'])
+              && text(d.productId, 100) && quantity(d.quantity) && d.quantity > 0 && unit(d.unit) && d.checked is bool
+              && getAfter(/databases/$(database)/documents/households/$(h)/items/$('p_' + d.productId)).data.unit == d.unit)
+            || (d.kind == 'operation' && id == 'o_' + d.operationId && d.keys().hasOnly(['kind', 'operationId']) && text(d.operationId, 80));
+        }
+        allow read: if member(h);
+        allow create, update: if member(h) && id != '_version' && validItem(request.resource.data) && versionAdvanced(h);
+        allow delete: if member(h) && id != '_version' && resource.data.kind != 'operation' && versionAdvanced(h);
+        allow create: if id == '_version' && creatingOwner(h) && request.resource.data == {'kind': 'version', 'revision': 0};
+        allow update: if id == '_version' && member(h) && request.resource.data.keys().hasOnly(['kind', 'revision'])
+          && request.resource.data.kind == 'version' && request.resource.data.revision is int && request.resource.data.revision == resource.data.revision + 1;
+      }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
