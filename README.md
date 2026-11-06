@@ -6,7 +6,7 @@ Inventario del hogar y lista de compras, con modo local sin cuentas y conexión 
 
 - Etapa 1: inventario CRUD, categorías, cantidades, unidades, mínimos, búsqueda y filtros.
 - Etapa 2: lista por categorías, checks, cantidades editables, manuales y reposición al terminar.
-- Etapa 3: código de Google Sign-In, hogares, invitaciones, roles, sincronización, reglas y emuladores. La conexión real queda pendiente de configurar un proyecto tuyo.
+- Etapa 3: código de Google Sign-In, hogares, invitaciones, roles, sincronización, reglas y emuladores. El proyecto encasa-5258f está configurado; resta verificar el ingreso real y publicar la web.
 - Etapa 4 pendiente: PWA instalable, service worker, apertura offline y cola de escrituras compartidas.
 
 El modo local sigue funcionando sin variables de entorno. No se sube el inventario local automáticamente al iniciar sesión. El modo compartido de esta etapa necesita Internet para escribir; muestra cambios optimistas mientras el servidor confirma y revierte si falla.
@@ -34,7 +34,7 @@ En Windows, si Java devuelve `Unable to establish loopback connection`, usá una
 2. Registrá una aplicación web en Configuración del proyecto. Copiá `.env.example` a `.env.local` y completá `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` y `VITE_FIREBASE_APP_ID` con la configuración web pública que muestra Firebase. No uses claves privadas ni JSON de cuentas de servicio.
 3. Authentication → Sign-in method: habilitá **solo Google**, con tu correo de soporte. En Authorized domains dejá únicamente los dominios que usa tu aplicación en producción (incluido el authDomain) y los de desarrollo necesarios: localhost y 127.0.0.1. No agregues dominios comodín o de terceros. El navegador del iPhone debe abrir la web publicada; localhost en el iPhone apunta al propio teléfono.
 4. Creá Cloud Firestore **Standard**, elegí una región adecuada y empezá en modo producción (reglas cerradas). No actives test mode. No se necesita cargar datos manualmente.
-5. App Check → aplicación web → reCAPTCHA v3: registrá una clave pública para tus dominios y completá `VITE_RECAPTCHA_SITE_KEY`. Verificá el plan/cuota sin facturación que ofrezca el proveedor. La clave de sitio es pública; no pongas la clave secreta de reCAPTCHA en el frontend. Para desarrollar sin reCAPTCHA real, usá los emuladores indicados abajo.
+5. App Check → aplicación web → Fraud Defense (reCAPTCHA Enterprise): registrá una clave pública web de tipo score (sin challenges) para tus dominios y completá `VITE_RECAPTCHA_SITE_KEY`. reCAPTCHA Classic está retirado para nuevas configuraciones. Verificá el plan/cuota sin facturación que ofrezca el proveedor. La clave de sitio es pública; no uses claves secretas en el frontend. La app utiliza `ReCaptchaEnterpriseProvider`. Para desarrollar sin reCAPTCHA real, usá los emuladores indicados abajo.
 6. Publicá las reglas del repositorio en tu proyecto, antes de usar datos reales:
 
 ```sh
@@ -47,7 +47,7 @@ npx firebase deploy --only firestore:rules --project TU_PROJECT_ID
 9. Reiniciá Vite o recompilá el build: las variables VITE se incorporan durante la compilación. Ajustes del hogar mostrará **Ingresar con Google** cuando todos los valores necesarios estén presentes.
 10. Probá el login en Safari/Chrome/Edge, fuera de navegadores embebidos que bloqueen popups. El flujo usa `signInWithPopup` desde un toque del usuario; los bloqueos se muestran como error. No se utiliza redirect automático para evitar los problemas de almacenamiento entre dominios de Safari.
 
-Referencia oficial: [planes de Firebase](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans), [precios y cuotas](https://firebase.google.com/pricing), [Google Sign-In](https://firebase.google.com/docs/auth/web/google-signin), [App Check web](https://firebase.google.com/docs/app-check/web/recaptcha-provider), [enforcement](https://firebase.google.com/docs/app-check/enable-enforcement).
+Referencia oficial: [planes de Firebase](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans), [precios y cuotas](https://firebase.google.com/pricing), [Google Sign-In](https://firebase.google.com/docs/auth/web/google-signin), [App Check web](https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider), [enforcement](https://firebase.google.com/docs/app-check/enable-enforcement).
 
 ### Costos y presupuesto
 
@@ -131,7 +131,7 @@ Las membresías solo se crean mediante bootstrap atómico o el flujo de invitaci
 
 ## Deploy gratuito en Firebase Hosting
 
-No se hizo un deploy real desde este proyecto. Después de configurar tu proyecto Spark:
+Las reglas ya se publicaron en encasa-5258f. Todavía no se publicó la web en Hosting. Después de configurar tu proyecto Spark:
 
 ```sh
 npm ci
@@ -145,3 +145,15 @@ npx firebase deploy --only hosting,firestore:rules --project TU_PROJECT_ID
 Vercel puede servir el build Vite (`npm run build`, salida `dist`), pero requiere configurar allí variables, rewrite SPA y headers equivalentes a `firebase.json`. No se configuró Vercel en esta etapa.
 
 La instalación en pantalla de inicio de iPhone y como app en Windows se documentará y verificará con el manifest y el service worker de la etapa 4; esta versión todavía no promete instalación ni apertura offline.
+
+## Configuración realizada el 6 de noviembre de 2026
+
+- Proyecto: `encasa-5258f`, plan Spark, sin activar facturación ni backups pagos.
+- Aplicación web: `En casa web`. La configuración pública se guardó en `.env.local`, ignorado por Git; `.firebaserc` fija el proyecto correcto.
+- Google Sign-In habilitado con nombre público “En casa” y correo de soporte del propietario. Los dominios permitidos son localhost, 127.0.0.1 y los dominios firebaseapp.com/web.app de este proyecto.
+- Firestore Standard `(default)` en `southamerica-east1` (São Paulo), creado en modo producción. Se publicaron las reglas de este repositorio.
+- API de reCAPTCHA Enterprise activada con autorización del propietario. Clave web `En casa - App Check`, sin challenges, con validación de dominio activa. Allowlist: encasa-5258f.web.app, encasa-5258f.firebaseapp.com, localhost y 127.0.0.1. El proveedor está registrado en Firebase y Firestore figura **Enforced**. La consola informa hasta 15 minutos de propagación.
+- API key limitada a seis referrers: ambos dominios HTTPS de Firebase y localhost/127.0.0.1 en los puertos 5173 y 4173. Restringida a Firestore, App Check, Installations, Identity Toolkit y Token Service. Google indica hasta cinco minutos de propagación.
+- El cliente usa `ReCaptchaEnterpriseProvider` porque la consola ya no permite nuevas configuraciones de reCAPTCHA Classic. Sin facturación, Fraud Defense usa Essentials: cuota gratuita y rechazo al excederla, sin cobros. [Condiciones y cuotas oficiales](https://docs.cloud.google.com/recaptcha/docs/billing-information).
+
+Pendiente: probar login Google y operaciones reales entre dos cuentas desde Safari/Chrome/Edge. App Check no sustituye las reglas de Firestore. No se cambiaron reglas a modo abierto ni se publicaron datos del inventario local automáticamente. No se desplegó Hosting ni se completó aún la PWA.
