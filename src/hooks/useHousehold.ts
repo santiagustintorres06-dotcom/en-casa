@@ -13,6 +13,7 @@ import {
   onSnapshot,
   setDoc,
   terminate,
+  Timestamp,
 } from "firebase/firestore";
 import {
   firebase,
@@ -25,7 +26,6 @@ import {
   deactivateHousehold,
   joinHousehold,
   rotateInvitation,
-  saveSharedState,
   watchState,
   watchUserHousehold,
   type Household,
@@ -35,6 +35,18 @@ import { emptyHousehold } from "../services/cloudState";
 import { loadHousehold } from "../services/storage";
 import type { InventoryPort } from "../types/inventoryPort";
 import type { HouseholdState } from "../types/shopping";
+import { replayChanges } from "../services/offlineChanges";
+import {
+  readOfflineCache,
+  writeOfflineCache,
+  removeOfflineCache,
+  queuedChanges,
+  queueChange,
+  acknowledgeChange,
+  discardChanges,
+  clearAppData,
+} from "../services/offlineStorage";
+import { syncChange } from "../services/syncChanges";
 
 export function useHousehold() {
   const runtime = firebase;
@@ -55,9 +67,32 @@ export function useHousehold() {
   const saving = useRef(false);
   const subscriptions = useRef<(() => void)[]>([]);
   const generation = useRef(0);
+  const [queuedCount, setQueuedCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [queueTick, setQueueTick] = useState(0);
+  const conflict = useRef(false);
+  function paintQueue() {
+    if (!user || !id) return;
+    const changes = queuedChanges(user.uid, id);
+    setQueuedCount(changes.length);
+    let visible = confirmed.current.state;
+    try {
+      visible = replayChanges(visible, changes);
+      conflict.current = false;
+    } catch (e) {
+      conflict.current = true;
+      setError(cloudError(e));
+      if (changes.length) visible = changes[changes.length - 1].after;
+    }
+    current.current = { state: visible, revision: confirmed.current.revision };
+    setState(visible);
+  }
 
   useEffect(() => {
-    const update = () => setOnline(navigator.onLine);
+    const update = () => {
+      setOnline(navigator.onLine);
+      if (navigator.onLine) setConnectionAttempt((v) => v + 1);
+    };
     addEventListener("online", update);
     addEventListener("offline", update);
     return () => {
@@ -69,19 +104,25 @@ export function useHousehold() {
     if (!runtime) return;
     const stopAuth = onAuthStateChanged(runtime.auth, (next) => {
       setUser(next);
-      setId("");
+      let cached = null;
+      try {
+        if (next) cached = readOfflineCache(next.uid);
+      } catch (e) {
+        setError(cloudError(e));
+      }
+      setId(cached?.householdId ?? "");
       setHome(null);
       setReady(false);
       setProfileReady(false);
       setError("");
-      setLoading(!!next);
+      setLoading(!!next && navigator.onLine);
     });
     return stopAuth;
   }, []);
   useEffect(() => {
     if (!runtime || !user) return;
     setProfileReady(false);
-    setLoading(true);
+    setLoading(navigator.onLine);
     const stop = watchUserHousehold(
       runtime.db,
       user.uid,
@@ -117,6 +158,33 @@ export function useHousehold() {
     setMembers([]);
     current.current = { state: emptyHousehold(), revision: -1 };
     confirmed.current = current.current;
+    let liveHome: Household | null = null;
+    let liveMembers: HouseholdMember[] = [];
+    try {
+      const cached = readOfflineCache(user.uid);
+      if (cached?.householdId === id) {
+        const { inviteExpiresAtMillis, ...fields } = cached.home;
+        liveHome = {
+          ...fields,
+          inviteExpiresAt: Timestamp.fromMillis(inviteExpiresAtMillis),
+        };
+        liveMembers = cached.members;
+        confirmed.current = { state: cached.state, revision: cached.revision };
+        setHome(liveHome);
+        setMembers(liveMembers);
+        paintQueue();
+        setReady(true);
+        setLoading(false);
+      } else if (!navigator.onLine) {
+        setLoading(false);
+        setError(
+          "Conectate una vez para descargar el hogar antes de usarlo sin señal.",
+        );
+      }
+    } catch (e) {
+      setError(cloudError(e));
+      setLoading(false);
+    }
     let denied = false;
     let homeLoaded = false,
       membersLoaded = false,
@@ -131,11 +199,37 @@ export function useHousehold() {
           setError("");
           connected = true;
         }
+        if (liveHome) {
+          try {
+            const { inviteExpiresAt, ...fields } = liveHome;
+            writeOfflineCache(user.uid, {
+              householdId: id,
+              home: {
+                ...fields,
+                inviteExpiresAtMillis: inviteExpiresAt.toMillis(),
+              },
+              members: liveMembers,
+              state: confirmed.current.state,
+              revision: confirmed.current.revision,
+            });
+          } catch {
+            setError(
+              "No pudimos actualizar la copia offline. Revisá el espacio del navegador antes de salir.",
+            );
+          }
+        }
       }
     };
     const fail = (e: unknown) => {
       if (generation.current !== token) return;
       denied = true;
+      if (
+        e &&
+        typeof e === "object" &&
+        "code" in e &&
+        String(e.code).includes("permission-denied")
+      )
+        removeOfflineCache(user.uid);
       setError(cloudError(e));
       setReady(false);
       setLoading(false);
@@ -165,6 +259,7 @@ export function useHousehold() {
             return;
           }
           setHome({ ...snap.data(), id } as Household);
+          liveHome = { ...snap.data(), id } as Household;
           homeLoaded = true;
           updateReady();
         },
@@ -180,11 +275,10 @@ export function useHousehold() {
             snap.metadata.fromCache
           )
             return;
-          setMembers(
-            snap.docs.map(
-              (d) => ({ ...d.data(), uid: d.id }) as HouseholdMember,
-            ),
+          liveMembers = snap.docs.map(
+            (d) => ({ ...d.data(), uid: d.id }) as HouseholdMember,
           );
+          setMembers(liveMembers);
           membersLoaded = true;
           updateReady();
         },
@@ -195,11 +289,9 @@ export function useHousehold() {
         id,
         (next, revision) => {
           if (generation.current !== token || denied) return;
-          confirmed.current = { state: next, revision };
-          if (!saving.current || revision >= current.current.revision) {
-            current.current = confirmed.current;
-            setState(next);
-          }
+          if (revision >= confirmed.current.revision)
+            confirmed.current = { state: next, revision };
+          paintQueue();
           itemsLoaded = true;
           updateReady();
         },
@@ -211,64 +303,126 @@ export function useHousehold() {
       generation.current += 1;
       stops.forEach((stop) => stop());
       saving.current = false;
+      setSyncing(false);
       setPending(false);
     };
   }, [id, user, connectionAttempt]);
 
-  function commit(change: (s: HouseholdState) => HouseholdState) {
-    if (!runtime || !home || !ready) {
-      setError(
-        (previous) =>
-          previous ||
-          "No pudimos conectar con el hogar. Tocá Reintentar conexión para volver a cargarlo.",
-      );
-      return false;
-    }
-    if (saving.current) {
-      setError("Estamos guardando el cambio anterior. Esperá un momento.");
-      return false;
-    }
-    if (!navigator.onLine) {
-      setError(
-        "En esta etapa el hogar compartido necesita conexión para guardar. El modo offline llega con la PWA.",
-      );
-      return false;
-    }
-    const before = current.current;
-    let next;
-    try {
-      next = change(before.state);
-    } catch (e) {
-      setError(cloudError(e));
-      return false;
-    }
-    if (next === before.state) return true;
-    const token = generation.current;
-    saving.current = true;
-    setPending(true);
-    setError("");
-    current.current = { state: next, revision: before.revision + 1 };
-    setState(next);
-    saveSharedState(runtime.db, home.id, before.state, next, before.revision)
-      .then(() => {
-        if (generation.current === token) {
-          confirmed.current = current.current;
-        }
-      })
-      .catch((e) => {
-        if (generation.current === token) {
-          current.current = confirmed.current;
-          setState(confirmed.current.state);
+  useEffect(() => {
+    if (!id || !user) return;
+    const update = (e: StorageEvent) => {
+      if (e.key?.startsWith("encasa.")) {
+        try {
+          const cached = readOfflineCache(user.uid);
+          if (
+            cached?.householdId === id &&
+            cached.revision > confirmed.current.revision
+          )
+            confirmed.current = {
+              state: cached.state,
+              revision: cached.revision,
+            };
+          paintQueue();
+          setQueueTick((v) => v + 1);
+        } catch (e) {
           setError(cloudError(e));
         }
-      })
-      .finally(() => {
+      }
+    };
+    addEventListener("storage", update);
+    return () => removeEventListener("storage", update);
+  }, [id, user]);
+
+  useEffect(() => {
+    if (!runtime || !user || !id || !ready || !online || saving.current) return;
+    const token = generation.current;
+    const run = async () => {
+      if (generation.current !== token || saving.current) return;
+      saving.current = true;
+      setSyncing(true);
+      try {
+        while (navigator.onLine && generation.current === token) {
+          const change = queuedChanges(user.uid, id)[0];
+          if (!change) break;
+          const result = await syncChange(runtime.db, id, change);
+          if (generation.current !== token) return;
+          acknowledgeChange(user.uid, id, change.id);
+          if (result.revision >= confirmed.current.revision)
+            confirmed.current = result;
+          const cached = readOfflineCache(user.uid);
+          if (cached?.householdId === id)
+            writeOfflineCache(user.uid, { ...cached, ...confirmed.current });
+          paintQueue();
+          setError("");
+        }
+      } catch (e) {
+        if (generation.current === token) {
+          setError(
+            `${cloudError(e)} Tus cambios pendientes siguen en este dispositivo.`,
+          );
+          if (
+            e &&
+            typeof e === "object" &&
+            "code" in e &&
+            String(e.code).includes("permission-denied")
+          ) {
+            removeOfflineCache(user.uid);
+            setReady(false);
+          }
+        }
+      } finally {
         if (generation.current === token) {
           saving.current = false;
-          setPending(false);
+          setSyncing(false);
         }
+      }
+    };
+    if (navigator.locks)
+      void navigator.locks.request(`encasa-sync-${user.uid}-${id}`, run);
+    else void run();
+  }, [id, user, ready, online, queueTick, connectionAttempt]);
+
+  function commit(change: (s: HouseholdState) => HouseholdState) {
+    if (!user || !id || !home || !ready) {
+      setError(
+        (previous) =>
+          previous || "Primero conectá el hogar para guardar cambios.",
+      );
+      return false;
+    }
+    if (conflict.current) {
+      setError(
+        "Revisá los cambios pendientes antes de seguir. Podés exportarlos o descartarlos desde Ajustes.",
+      );
+      return false;
+    }
+    try {
+      const before = current.current.state;
+      const after = change(before);
+      if (after === before) return true;
+      const changes = queuedChanges(user.uid, id);
+      const operationId = "sync-" + crypto.randomUUID();
+      queueChange(user.uid, id, {
+        id: operationId,
+        createdAt: Math.max(Date.now(), (changes.at(-1)?.createdAt ?? 0) + 1),
+        before,
+        after: {
+          ...after,
+          completedOperations: [...after.completedOperations, operationId],
+        },
       });
-    return true;
+      paintQueue();
+      setQueueTick((v) => v + 1);
+      setError("");
+      return true;
+    } catch (e) {
+      setError(
+        e instanceof Error && e.name === "QuotaExceededError"
+          ? "No hay espacio para guardar el cambio offline. Liberá espacio antes de seguir."
+          : cloudError(e),
+      );
+      return false;
+    }
   }
   async function action(task: () => Promise<unknown>) {
     if (!navigator.onLine) {
@@ -287,13 +441,20 @@ export function useHousehold() {
       setPending(false);
     }
   }
-  async function logout() {
+  async function logout(discardPending = false) {
     if (!runtime) return false;
     if (saving.current) {
-      setError("Esperá a que se guarden los cambios antes de cerrar sesión.");
+      setError("Esperá a que termine el envío antes de cerrar sesión.");
       return false;
     }
-    return action(async () => {
+    if (user && id && queuedChanges(user.uid, id).length && !discardPending) {
+      setError(
+        "Hay cambios pendientes. Sincronizalos o confirmá que querés descartarlos al salir.",
+      );
+      return false;
+    }
+    setPending(true);
+    try {
       subscriptions.current.forEach((stop) => stop());
       subscriptions.current = [];
       generation.current += 1;
@@ -301,14 +462,18 @@ export function useHousehold() {
       setState(emptyHousehold());
       setHome(null);
       setMembers([]);
-      // Stop listeners before terminating and clearing any Firestore cache left by earlier versions.
       await terminate(runtime.db);
       await clearIndexedDbPersistence(runtime.db);
-      localStorage.removeItem("encasa.household.v2");
-      localStorage.removeItem("encasa.inventory.v1");
+      clearAppData();
       await signOut(runtime.auth);
       location.reload();
-    });
+      return true;
+    } catch (e) {
+      setError(cloudError(e));
+      return false;
+    } finally {
+      setPending(false);
+    }
   }
   const port: InventoryPort | undefined = id
     ? {
@@ -331,9 +496,32 @@ export function useHousehold() {
     profileReady,
     error,
     online,
+    queuedCount,
+    syncing,
+    exportPending: () => {
+      if (!user || !id) return;
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(queuedChanges(user.uid, id), null, 2)], {
+          type: "application/json",
+        }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "en-casa-cambios-pendientes.json";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+    discardPending: async () => {
+      if (!user || !id || saving.current) return false;
+      discardChanges(user.uid, id);
+      conflict.current = false;
+      paintQueue();
+      setError("");
+      return true;
+    },
     port,
     retryConnection: () => {
-      if (!pending) {
+      if (!pending && !saving.current) {
         setReady(false);
         setError("");
         setLoading(true);

@@ -32,6 +32,7 @@ import {
 } from "../src/services/households.ts";
 import { decodeState } from "../src/services/cloudState.ts";
 import { finishShopping } from "../src/services/shopping.ts";
+import { syncChange } from "../src/services/syncChanges.ts";
 
 let env;
 const auth = (uid) =>
@@ -464,3 +465,33 @@ test(
     }
   },
 );
+
+test("reenvío offline después de confirmar en servidor no duplica stock", async () => {
+  const db = auth("member");
+  const docs = await getDocs(collection(db, "households/home/items"));
+  const { state } = decodeState(
+    docs.docs.map((d) => ({ id: d.id, data: d.data() })),
+  );
+  const selected = {
+    ...state,
+    selections: { rice: { checked: true, quantity: 7, unit: "un" } },
+  };
+  const change = {
+    id: "sync-offline",
+    createdAt: 1,
+    before: selected,
+    after: finishShopping(selected, "offline-purchase", "now"),
+  };
+  // Enviar primero el check, como ocurre en la cola real.
+  await syncChange(db, "home", {
+    id: "sync-check",
+    createdAt: 0,
+    before: state,
+    after: selected,
+  });
+  await syncChange(db, "home", change);
+  await syncChange(db, "home", change);
+  const product = await getDoc(doc(db, "households/home/items/p_rice"));
+  assert.equal(product.data().quantity, 7);
+  await assertFails(syncChange(auth("outsider"), "home", change));
+});
