@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   productSuggestions,
   type ProductSuggestion,
@@ -13,6 +13,15 @@ export function ProductNameInput({
   onPick: (p: ProductSuggestion) => void;
 }) {
   const id = useId();
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !root.current?.contains(event.target))
+        setOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, []);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const suggestions = productSuggestions(value);
@@ -23,7 +32,17 @@ export function ProductNameInput({
     setActive(-1);
   }
   return (
-    <div className="name-autocomplete">
+    <div
+      ref={root}
+      className="name-autocomplete"
+      onBlur={(event) => {
+        if (
+          event.relatedTarget instanceof Node &&
+          !event.currentTarget.contains(event.relatedTarget)
+        )
+          setOpen(false);
+      }}
+    >
       <label htmlFor={id}>Nombre</label>
       <input
         id={id}
@@ -47,7 +66,6 @@ export function ProductNameInput({
           setActive(-1);
         }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" && suggestions.length) {
             e.preventDefault();

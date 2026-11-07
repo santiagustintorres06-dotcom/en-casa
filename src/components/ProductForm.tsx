@@ -6,6 +6,7 @@ import {
   type Product,
   type ProductInput,
 } from "../types/product";
+import { ProductNameInput } from "./ProductNameInput";
 import { validateProduct } from "../services/stock";
 export function ProductForm({
   product,
@@ -17,6 +18,11 @@ export function ProductForm({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const [name, setName] = useState(product?.name ?? "");
+  const [category, setCategory] = useState<ProductInput["category"]>(
+    product?.category ?? "Almacén",
+  );
+  const [unit, setUnit] = useState<ProductInput["unit"]>(product?.unit ?? "un");
   const [error, setError] = useState("");
   useEffect(() => {
     ref.current?.showModal();
@@ -52,21 +58,25 @@ export function ProductForm({
             <X />
           </button>
         </div>
-        <label>
-          Nombre
-          <input
-            name="name"
-            autoFocus
-            required
-            maxLength={80}
-            defaultValue={product?.name}
-            placeholder="Ej.: Arroz integral"
-          />
-        </label>
+        <ProductNameInput
+          value={name}
+          onChange={setName}
+          onPick={(p) => {
+            setName(p.name);
+            setCategory(p.category);
+            setUnit(p.unit);
+          }}
+        />
         <div className="form-grid">
           <label>
             Categoría
-            <select name="category" defaultValue={product?.category}>
+            <select
+              name="category"
+              value={category}
+              onChange={(e) =>
+                setCategory(e.target.value as ProductInput["category"])
+              }
+            >
               {categories.map((c) => (
                 <option key={c}>{c}</option>
               ))}
@@ -74,7 +84,11 @@ export function ProductForm({
           </label>
           <label>
             Unidad
-            <select name="unit" defaultValue={product?.unit}>
+            <select
+              name="unit"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value as ProductInput["unit"])}
+            >
               {units.map((u) => (
                 <option key={u}>{u}</option>
               ))}
