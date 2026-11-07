@@ -203,3 +203,9 @@ Verificado en Firebase real: se cargaron jabón, desodorante y fideos a Casa Fam
 ## Publicación del 7 de noviembre de 2026
 
 URL: https://encasa-5258f.web.app. Se desplegó únicamente Hosting al proyecto existente encasa-5258f, sin cambiar el plan ni activar facturación. Verificados Google Sign-In y lectura de Casa Familia Torres (6 productos), manifest y service worker HTTP 200, CSP/nosniff/Referrer-Policy/Permissions-Policy/HSTS y sw.js con Cache-Control no-cache. Falta instalar y probar modo avión/reconexión desde iPhone y Windows reales.
+
+### Catálogo de sugerencias ampliado
+
+El catálogo incluye 150 productos comunes de almacén, lácteos, verdulería, carnicería, congelados, bebidas, limpieza e higiene. En Lista de compras → Agregar ítem, escribir parte del nombre muestra hasta seis sugerencias y al elegir una completa categoría y unidad. Incluye arvejas, atún y choclo; tolera tildes y algunos alias como choclos/maíz y muzzarella. Se puede seguir escribiendo un producto que no esté en el catálogo. Las sugerencias no cargan productos automáticamente en el inventario ni requieren lecturas nuevas de Firebase.
+
+Para probar: escribir arv, atun o choclos y elegir una sugerencia; verificar nombre, categoría y unidad antes de agregar. En una PWA que ya estaba abierta, aceptar Actualizar app cuando aparezca (primero sincronizar pendientes). Los tests verifican 150 claves/nombres únicos, datos válidos y que cada producto se encuentre por su nombre.
