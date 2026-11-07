@@ -1,254 +1,27 @@
 # En casa
 
-Programa destinado al uso familiar, desarrollado con una estructura organizada y patrones establecidos de arquitectura y manejo de estado. Mediante asistencia de inteligencia artificial, busca generar una solución a un problema cotidiano: saber qué hay en casa y organizar las compras del supermercado entre todos los integrantes del hogar.
+Aplicación de uso familiar para gestionar el stock del hogar y armar la lista del supermercado.
 
-Inventario del hogar y lista de compras, con modo local sin cuentas y conexión opcional a un hogar compartido. React + Vite + TypeScript + Tailwind CSS + Firebase Auth/Firestore. No usa servidor propio ni Cloud Functions.
+Desarrollada con una estructura organizada y patrones establecidos, mediante asistencia de inteligencia artificial, para resolver un problema cotidiano.
 
-**Abrir la aplicación:** [En casa](https://encasa-5258f.web.app).
+**[Abrir En casa](https://encasa-5258f.web.app)**
 
-## Guía para la familia: instalar y empezar
+## Qué permite
 
-No hace falta descargarla de una tienda ni crear una contraseña nueva. Para compartir el inventario, cada integrante ingresa con su propia cuenta de Google y se une al mismo hogar mediante una invitación. No se comparte la contraseña de Google.
+- Controlar el inventario y detectar faltantes automáticamente.
+- Armar la compra con sugerencias de 150 productos.
+- Compartir los datos entre integrantes del hogar.
+- Instalarse en el celular y guardar cambios sin conexión.
 
-### 1. Instalar en el celular
+## Instalación
 
-**Android (Chrome)**
+- **Android:** abrir en Chrome → menú ⋮ → Instalar aplicación.
+- **iPhone:** abrir en Safari → Compartir → Agregar a pantalla de inicio.
 
-1. Abrí Chrome y entrá a https://encasa-5258f.web.app. Si recibiste el enlace por WhatsApp, abrilo en Chrome.
-2. Tocá el menú de los tres puntos.
-3. Elegí **Instalar aplicación** o **Agregar a pantalla principal**, según la versión, y confirmá.
-4. Abrí **En casa** desde el nuevo ícono.
+Para compartir el hogar, ingresar con Google y unirse con el código de invitación de un integrante.
 
-**iPhone (Safari)**
+## Tecnologías
 
-1. Abrí Safari y entrá a https://encasa-5258f.web.app. Si recibiste el enlace por WhatsApp, abrilo en Safari.
-2. Tocá **Compartir** y buscá **Agregar a pantalla de inicio**.
-3. Si aparece la opción **Abrir como app web**, dejala activada. Confirmá con **Agregar**.
-4. Abrí **En casa** desde el nuevo ícono.
+React · TypeScript · Vite · Tailwind CSS · Firebase · PWA.
 
-Los nombres y la ubicación de las opciones pueden variar según el teléfono. También podés usar la web sin instalarla.
-
-### 2. Sumarse al hogar familiar
-
-1. En tu aplicación, el propietario abre **Ajustes del hogar → Invitá a alguien → Copiar código**. Si venció, toca **Renovar**; las invitaciones duran 48 horas.
-2. En el celular del nuevo integrante, abrir **En casa → Ajustes del hogar → Ingresar con Google** y elegir su propia cuenta. Google puede pedir una verificación de seguridad de esa cuenta.
-3. En **Sumate a un hogar**, pegar el código y tocar **Unirme al hogar**. No crear otro hogar si quieren compartir el mismo inventario.
-4. Esperar a que aparezcan el nombre del hogar y sus productos, con el estado **Hogar sincronizado**. Si Safari solicita ingresar otra vez al abrir el ícono instalado, repetir el ingreso allí.
-
-Compartí la invitación solo con integrantes de confianza: todos los miembros pueden modificar el inventario y la lista.
-
-### 3. Primera compra y prueba de conexión
-
-1. En **Inventario**, revisar lo que hay en casa. **Se acabó** lleva el producto a los faltantes.
-2. En **Lista de compras → Agregar ítem**, escribir parte de un nombre: por ejemplo, `arv`, `atun` o `choclos`. El catálogo tiene 150 productos; también admite nombres libres.
-3. En el súper, ajustar la cantidad y tildar lo comprado. Al finalizar, tocar **Terminé la compra** y confirmar para sumarlo al inventario.
-4. Antes de salir, abrir el hogar con Internet y esperar la sincronización. Sin señal, los cambios se guardan en ese dispositivo. Al recuperar conexión, volver a abrir la app y esperar que se envíen los pendientes.
-5. Comprobar desde el otro celular que ambos ven los mismos datos. Si hay un error, conservar la sesión y los datos del navegador; revisar **Ajustes del hogar** antes de borrar o reinstalar.
-
-## Estado del proyecto
-
-- Etapa 1: inventario CRUD, categorías, cantidades, unidades, mínimos, búsqueda y filtros.
-- Etapa 2: lista por categorías, checks, cantidades editables, manuales y reposición al terminar.
-- Etapa 3: código de Google Sign-In, hogares, invitaciones, roles, sincronización, reglas y emuladores. El ingreso y la lectura del hogar real están verificados; web publicada; resta probar entre dispositivos.
-- Etapa 4 implementada: manifest, íconos, service worker, apertura offline y cola durable con reenvío idempotente. Publicada en Firebase Hosting. Pendiente instalación en equipos reales.
-
-El modo local sigue funcionando sin variables de entorno. No se sube el inventario local automáticamente al iniciar sesión. El modo compartido conserva cambios optimistas en una cola local durable y los envía al volver la conexión con la app abierta. Requiere una primera apertura online del hogar.
-
-## Ejecutar y verificar
-
-Usar Node.js 24 LTS, npm y Java 21+ (para los emuladores):
-
-```sh
-npm ci
-npm run dev
-npm test
-npm run build
-npm run test:rules
-npm audit
-```
-
-`npm run preview` sirve el build. `npm run format` aplica formato al código. No se necesitan credenciales reales para los tests: usan `demo-encasa` en localhost y nunca tu base de producción. Los errores PERMISSION_DENIED que imprimen los tests negativos son esperados.
-
-Los tests de reglas cierran sus suscripciones; Node usa `--test-force-exit` después de completar todos los tests y hooks porque el SDK del emulador puede conservar canales gRPC residuales. No omite aserciones ni errores de tests.
-
-En Windows, si Java devuelve `Unable to establish loopback connection`, usá una carpeta temporal local corta y válida y configurá `JAVA_TOOL_OPTIONS` con `-Djdk.net.unixdomain.tmpdir="RUTA_TEMPORAL" -Djava.io.tmpdir="RUTA_TEMPORAL"`. No cambies certificados, firewall ni protecciones de red para resolverlo. `FIREBASE_EMULATORS_PATH` permite elegir dónde guardar los emuladores descargados.
-
-## Setup de Firebase sin facturación
-
-1. En [Firebase Console](https://console.firebase.google.com/) creá un proyecto en **Spark**, sin vincular una cuenta de facturación ni pasar a Blaze. No hace falta activar Analytics. Si la consola ofrece opciones de pago, no las habilites: este flujo no requiere Functions, Storage ni servicios pagos.
-2. Registrá una aplicación web en Configuración del proyecto. Copiá `.env.example` a `.env.local` y completá `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID` y `VITE_FIREBASE_APP_ID` con la configuración web pública que muestra Firebase. No uses claves privadas ni JSON de cuentas de servicio.
-3. Authentication → Sign-in method: habilitá **solo Google**, con tu correo de soporte. En Authorized domains dejá únicamente los dominios que usa tu aplicación en producción (incluido el authDomain) y los de desarrollo necesarios: localhost y 127.0.0.1. No agregues dominios comodín o de terceros. El navegador del iPhone debe abrir la web publicada; localhost en el iPhone apunta al propio teléfono.
-4. Creá Cloud Firestore **Standard**, elegí una región adecuada y empezá en modo producción (reglas cerradas). No actives test mode. No se necesita cargar datos manualmente.
-5. App Check → aplicación web → Fraud Defense (reCAPTCHA Enterprise): registrá una clave pública web de tipo score (sin challenges) para tus dominios y completá `VITE_RECAPTCHA_SITE_KEY`. reCAPTCHA Classic está retirado para nuevas configuraciones. Verificá el plan/cuota sin facturación que ofrezca el proveedor. La clave de sitio es pública; no uses claves secretas en el frontend. La app utiliza `ReCaptchaEnterpriseProvider`. Para desarrollar sin reCAPTCHA real, usá los emuladores indicados abajo.
-6. Publicá las reglas del repositorio en tu proyecto, antes de usar datos reales:
-
-```sh
-npx firebase login
-npx firebase deploy --only firestore:rules --project TU_PROJECT_ID
-```
-
-7. En App Check habilitá **Enforce** para Firestore. Tener el SDK inicializado no activa enforcement por sí solo. Revisá métricas si las peticiones legítimas son rechazadas; no abras las reglas como solución.
-8. En Google Cloud Console → APIs & Services → Credentials, restringí la API key pública por HTTP referrer a los orígenes de producción y desarrollo que usás, y por las APIs que necesita Firebase Auth/Firestore/App Check. Probá login y sincronización después de restringirla. La protección de datos proviene de Auth + reglas + App Check; ocultar la API key no reemplaza esos controles.
-9. Reiniciá Vite o recompilá el build: las variables VITE se incorporan durante la compilación. Ajustes del hogar mostrará **Ingresar con Google** cuando todos los valores necesarios estén presentes.
-10. Probá el login en Safari/Chrome/Edge, fuera de navegadores embebidos que bloqueen popups. El flujo usa `signInWithPopup` desde un toque del usuario; los bloqueos se muestran como error. No se utiliza redirect automático para evitar los problemas de almacenamiento entre dominios de Safari.
-
-Referencia oficial: [planes de Firebase](https://firebase.google.com/docs/projects/billing/firebase-pricing-plans), [precios y cuotas](https://firebase.google.com/pricing), [Google Sign-In](https://firebase.google.com/docs/auth/web/google-signin), [App Check web](https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider), [enforcement](https://firebase.google.com/docs/app-check/enable-enforcement).
-
-### Costos y presupuesto
-
-Spark tiene cuotas gratuitas; este proyecto debe permanecer sin cuenta de facturación vinculada. Si se alcanza una cuota puede dejar de sincronizar hasta que se renueve. La app muestra errores de cuota. No cambiar a Blaze para resolver un error sin revisar antes las cuotas.
-
-Las alertas de presupuesto de Google Cloud se configuran sobre una cuenta de facturación y **no limitan el gasto**. En este proyecto sin facturación no hace falta crear una para poner alertas. Si en el futuro elegís habilitarla: Billing → Budgets & alerts → Create budget → seleccionar proyecto, importe y avisos al 50/90/100 %, con destinatarios propios. [Documentación de presupuestos](https://cloud.google.com/billing/docs/how-to/budgets).
-
-## Probar sin cuenta de Firebase
-
-En una terminal:
-
-```sh
-npm run emulators
-```
-
-En `.env.local`, usar solamente:
-
-```dotenv
-VITE_USE_FIREBASE_EMULATORS=true
-```
-
-Después ejecutar `npm run dev`. Abrir localhost o 127.0.0.1. El modo emulador está deshabilitado en builds de producción y siempre apunta al proyecto ficticio `demo-encasa`. El emulador de Auth ofrece un proveedor Google de prueba: no ingreses credenciales reales allí. UI de los emuladores: http://127.0.0.1:4000/.
-
-Para probar roles distintos, usar dos perfiles de navegador y dos cuentas ficticias del emulador. El modo emulador se indica en Ajustes. Quitar la variable al terminar y reiniciar Vite. No exponer los puertos del emulador a Internet. Los datos emulados son temporales si no exportás su estado.
-
-## Cómo probar cada etapa
-
-### Inventario
-
-Agregar Arroz con cantidad 2 kg y mínimo 1. Restar uno: aparece como faltante. “Se acabó” lo deja en 0. Probar búsqueda, categorías, filtro de faltantes, edición, decimales y borrado con confirmación. Recargar conserva los datos locales. Probar ancho de 390 px y tema oscuro automático.
-
-### Lista de compras
-
-1. Con Arroz en 0, abrir Lista, cambiar cantidad a comprar a 7 y salir del campo.
-2. Tildarlo: **todavía no cambia el inventario**. Tocar “Terminé la compra” y confirmar: pasa a 7.
-3. Agregar Jabón como manual en Higiene; dejarlo sin tildar y terminar otra compra. Debe seguir pendiente, incluso después de recargar.
-4. Comprar Jabón: entra al inventario con mínimo 0. No se fusionan productos del mismo nombre para no confundir marcas o presentaciones.
-5. Compra parcial (stock 0, mínimo 2, compra 0,5): queda en 0,5 y continúa como faltante, destildado.
-6. Cancelar confirmación conserva los checks; sin checks no se puede terminar. Cantidades inválidas o stock mayor de 100.000 no se guardan.
-
-### Hogar compartido
-
-1. Ingresar con Google y crear un hogar. La creación comienza vacía y no sube datos locales sin indicarlo.
-2. En Ajustes, importar el inventario local si el hogar está vacío (hasta 150 productos/ítems). Los checks se reinician; no se importan recibos de compras anteriores.
-3. Copiar el código de invitación y unirse desde otra cuenta y otro perfil/dispositivo.
-4. Modificar un producto desde un dispositivo: el otro debe recibirlo en tiempo real. Comprar siete unidades debe reflejarse una sola vez.
-5. Provocar ediciones simultáneas: una revisión antigua no debe sobrescribir el cambio de otro integrante. Los movimientos de cantidad se suman; los conflictos de nombre/unidad/borrado se conservan como pendientes para exportar o descartar desde Ajustes.
-6. Como member, comprobar que no aparecen controles de owner; los tests verifican que tampoco se pueden invocar por fuera de la UI.
-7. Como owner, renovar código, probar que el anterior no sirve, expulsar un member y comprobar que pierde acceso. La expulsión también rota el código.
-8. Exportar un respaldo antes de cerrar sesión. Logout borra los datos de esta app en ese navegador, incluido su inventario local; el hogar permanece en Firebase.
-9. Desactivar hogar bloquea a todos. **No realiza purga física**: conserva registros. Para purgar, usar la consola de Firestore y borrar subcolecciones de `items` y `members`, invitaciones y punteros correspondientes. Conservar el documento raíz `status: deleted` para impedir la reutilización del ID.
-
-## Modelo de Firestore
-
-| Ruta                                    | Campos y función                                                                                                                        |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `users/{uid}`                           | `householdId`: hogar seleccionado de esa cuenta, o vacío. Solo el propio UID; apuntar a un hogar requiere membresía posterior al batch. |
-| `households/{id}`                       | `name`, `ownerUid`, `inviteCode`, `inviteExpiresAt`, `createdAt`, `updatedAt`, `status: active/deleted`.                                |
-| `households/{id}/members/{uid}`         | `role: owner/member`, `displayName`, `joinedAt`. Roles inmutables desde el cliente.                                                     |
-| `households/{id}/items/_version`        | `kind: version`, `revision`: contador para evitar sobrescrituras concurrentes.                                                          |
-| `households/{id}/items/p_{productId}`   | `kind: product`, `id`, `name` (1–80), `category`, `quantity` (0–100000), `unit`, `minimumStock` (0–100000), `updatedAt` (ISO).          |
-| `households/{id}/items/m_{manualId}`    | `kind: manual`, `id`, `name`, `category`, `quantity` (>0), `unit`, `checked`.                                                           |
-| `households/{id}/items/s_{productId}`   | `kind: selection`, `productId`, `quantity` (>0), `unit`, `checked`. La unidad debe coincidir con el producto.                           |
-| `households/{id}/items/o_{operationId}` | `kind: operation`, `operationId`: recibo de compra aplicado.                                                                            |
-| `invites/{code}`                        | `householdId`, `expiresAt`. Código de 32 caracteres hexadecimales (128 bits) generado por CSPRNG. No permite listados.                  |
-| `joinAttempts/{uid}`                    | `code`, `attemptedAt`: un intento por UID cada 10 s; ligado al código, utilizable durante 30 s. No se puede borrar desde el cliente.    |
-
-Los ítems se guardan en una colección común con discriminador `kind` para recibir un snapshot consistente de inventario y lista. Todas las mutaciones actualizan `_version` en la misma transacción. Los faltantes se derivan con `quantity <= minimumStock`; no se guardan duplicados. La compra suma solo lo tildado, limpia sus selecciones, conserva pendientes y registra su ID. Repetir ese ID no repone otra vez.
-
-Las membresías solo se crean mediante bootstrap atómico o el flujo de invitación validado por reglas; no existe alta libre de miembros. Los códigos se guardan como capacidades de acceso, no como contraseñas. El throttle es por cuenta, no global. Ver [revisión de seguridad y límites](SECURITY.md).
-
-## Datos locales y estructura
-
-`localStorage`: clave `encasa.household.v2`, con versión, productos, ítems manuales, selecciones y recibos. Migra el inventario anterior de `encasa.inventory.v1`, conservándolo como copia histórica. No usar una versión vieja de la app para editar datos nuevos. El respaldo JSON incluye la lista. Aún no hay restauración desde la interfaz.
-
-- `components/`: formularios, inventario, lista y ajustes.
-- `hooks/`: operaciones y coordinación de sesión/sincronización.
-- `services/`: lógica pura, almacenamiento y Firebase.
-- `types/`: esquemas y puerto intercambiable de inventario.
-- `tests/`: lógica, almacenamiento, invitaciones y reglas con casos negativos.
-
-## Deploy gratuito en Firebase Hosting
-
-Las reglas ya se publicaron en encasa-5258f. Todavía no se publicó la web en Hosting. Después de configurar tu proyecto Spark:
-
-```sh
-npm ci
-npm run build
-npx firebase login
-npx firebase deploy --only hosting,firestore:rules --project TU_PROJECT_ID
-```
-
-`firebase.json` sirve `dist/`, aplica HTTPS/headers y la ruta SPA. El build debe incorporar la configuración de producción y `VITE_USE_FIREBASE_EMULATORS=false`. Verificar login, App Check y CSP en el dominio final. No publicar `.env`, credenciales de servicio ni el directorio de emuladores.
-
-Vercel puede servir el build Vite (`npm run build`, salida `dist`), pero requiere configurar allí variables, rewrite SPA y headers equivalentes a `firebase.json`. No se configuró Vercel en esta etapa.
-
-## Instalar y probar la PWA
-
-La instalación requiere la web publicada con HTTPS (localhost solo sirve para pruebas en esa misma PC). Publicada en https://encasa-5258f.web.app.
-
-- **iPhone:** abrir la URL publicada en Safari → Compartir → Agregar a pantalla de inicio → Agregar. Abrir el ícono e ingresar con Google si Safari no comparte la sesión con la app instalada.
-- **Windows:** abrir la URL en Chrome/Edge → ícono de instalación en la barra o menú → Instalar En casa. También aparece un botón en la app cuando el navegador ofrece instalación.
-- Abrir el hogar con Internet y esperar la sincronización antes de salir. El service worker descarga solo archivos estáticos propios; no guarda respuestas de Auth, Firestore ni App Check.
-- Activar modo avión en el teléfono, cerrar y reabrir la app. Modificar stock, agregar un manual y terminar una compra de prueba. Recargar: los cambios deben seguir ahí. Desactivar modo avión y abrir la app: esperar que no haya pendientes y verificar desde otro dispositivo que el stock se sumó una vez.
-- Probar dos dispositivos desconectados: una reposición remota más un consumo local deben conservar ambos movimientos. Si cambia la unidad o hay conflictos de texto/borrado, exportar pendientes en Ajustes antes de descartarlos.
-- Logout pide confirmar el borrado de la copia local y avisa si hay pendientes. No cerrar sesión ni limpiar el almacenamiento del navegador antes de sincronizar/exportar.
-- Nueva versión: la app ofrece Actualizar app y bloquea el botón si hay cambios pendientes. Cerrar formularios antes de actualizar.
-
-No se promete sincronización con la app cerrada: Safari/iOS puede suspenderla. La cola se procesa en primer plano al abrir o recuperar conexión. El navegador puede desalojar almacenamiento por falta de espacio; usar respaldos.
-
-### Implementación offline
-
-Firestore mantiene caché en memoria. La copia confirmada del hogar se guarda por UID en localStorage, junto con un registro independiente por operación pendiente. Cada registro conserva el estado anterior/posterior y un UUID. Al reconectar, se aplica contra la última revisión del servidor y se guarda un recibo o_sync-{uuid} en la misma transacción que stock/lista. Reintentar después de un cierre no suma de nuevo. Web Locks serializa el envío entre pestañas cuando está disponible; las revisiones y recibos en Firestore protegen entre dispositivos.
-
-Cantidad se reconcilia como diferencia, con límites 0–100000; nombre/unidad/borrado incompatibles detienen el envío sin eliminar los pendientes. Desde Ajustes se pueden exportar o descartar (con confirmación). Los datos offline no están cifrados y un integrante expulsado puede conservar su copia hasta conectarse; el servidor siempre vuelve a validar membresía.
-
-Verificado localmente: build y manifest, 28 tests unitarios, 17 tests con reglas/emulador (incluye reenvío sin duplicar una compra de 7), sugerencias al escribir d y autocompletado de categoría/unidad. En el navegador se cerró el servidor de preview y la app siguió abriendo al recargar gracias al service worker. No equivale a una prueba en Safari/iPhone real.
-
-## Configuración realizada el 6 de noviembre de 2026
-
-- Proyecto: `encasa-5258f`, plan Spark, sin activar facturación ni backups pagos.
-- Aplicación web: `En casa web`. La configuración pública se guardó en `.env.local`, ignorado por Git; `.firebaserc` fija el proyecto correcto.
-- Google Sign-In habilitado con nombre público “En casa” y correo de soporte del propietario. Los dominios permitidos son localhost, 127.0.0.1 y los dominios firebaseapp.com/web.app de este proyecto.
-- Firestore Standard `(default)` en `southamerica-east1` (São Paulo), creado en modo producción. Se publicaron las reglas de este repositorio.
-- API de reCAPTCHA Enterprise activada con autorización del propietario. Clave web `En casa - App Check`, sin challenges, con validación de dominio activa. Allowlist: encasa-5258f.web.app, encasa-5258f.firebaseapp.com, localhost y 127.0.0.1. El proveedor está registrado en Firebase y Firestore figura **Enforced**. La consola informa hasta 15 minutos de propagación.
-- API key limitada a seis referrers: ambos dominios HTTPS de Firebase y localhost/127.0.0.1 en los puertos 5173 y 4173. Restringida a Firestore, App Check, Installations, Identity Toolkit y Token Service. Google indica hasta cinco minutos de propagación.
-- El cliente usa `ReCaptchaEnterpriseProvider` porque la consola ya no permite nuevas configuraciones de reCAPTCHA Classic. Sin facturación, Fraud Defense usa Essentials: cuota gratuita y rechazo al excederla, sin cobros. [Condiciones y cuotas oficiales](https://docs.cloud.google.com/recaptcha/docs/billing-information).
-
-El primer login Google y la lectura del hogar real quedaron verificados. Pendiente: probar operaciones entre dos cuentas desde Safari/Chrome/Edge. App Check no sustituye las reglas de Firestore. No se cambiaron reglas a modo abierto ni se publicaron datos del inventario local automáticamente. La PWA está publicada en Firebase Hosting.
-
-### Corrección de la primera conexión al hogar
-
-El primer ingreso real y la lectura de “Casa Familia Torres” quedaron verificados en el navegador. Se corrigió una carrera al crear el hogar: Firestore anuncia el puntero del usuario de forma optimista antes de confirmar las membresías del batch. La app ahora espera snapshots confirmados del servidor, escucha también cambios de metadata y espera hogar, integrantes e inventario antes de habilitar la edición. No cambió las reglas ni necesita recrear el hogar.
-
-Si la conexión falla, aparece **Reintentar conexión** en el inventario y en Ajustes. Se conserva el error original en lugar de reemplazarlo por una espera indefinida. Ya no se muestra un inventario vacío mientras se está cargando el hogar. Las pruebas de regresión suspenden la red durante la creación y verifican que el hogar no se abra hasta recibir la confirmación; también verifican el primer snapshot del inventario.
-
-El hogar compartido nuevo puede estar vacío aunque exista un inventario local. Para llevar esos productos al hogar, usar Ajustes → **Importar datos de este navegador**, con el hogar vacío. La importación es explícita; no se borraron ni se subieron automáticamente tus productos locales.
-
-## Productos básicos sin escribir todo a mano
-
-En Inventario → **Cargar básicos** hay un catálogo de 30 productos habituales, agrupados por categoría y con búsqueda sin distinguir tildes. Jabón, desodorante, fideos y arroz aparecen preseleccionados si todavía no existen. Se pueden seleccionar otros productos o cargar todos los visibles.
-
-Cada producto nuevo comienza con cantidad **0**, unidad y mínimo sugeridos; aparece como faltante para que ajustes su stock real o lo compres. Esas unidades y mínimos son editables. La carga es una sola operación: funciona tanto en modo local como en el hogar compartido.
-
-La app detecta productos existentes por identidad de catálogo o por nombre normalizado y categoría, incluso si difiere la unidad, para no pisar un stock ya cargado. Los muestra como “Ya está en tu inventario”. Repetir la selección no duplica productos ni cambia cantidades. Si borraste un básico, podés volver a cargarlo.
-
-Prueba: abrir el catálogo, buscar “jabon”, confirmar que encuentra “Jabón”, cargar algunos básicos y recargar. Volver a abrirlo debe mostrar esos productos bloqueados y sin nuevas selecciones para los cuatro básicos ya existentes. Los tests cubren carga, faltantes automáticos, repetición, tildes/espacios, producto renombrado y claves inválidas.
-
-Verificado en Firebase real: se cargaron jabón, desodorante y fideos a Casa Familia Torres, con stock 0; el arroz existente conservó su cantidad y unidad. La carga persistió tras recargar. La prueba de sincronización entre dos cuentas/dispositivos sigue pendiente.
-
-## Publicación del 7 de noviembre de 2026
-
-URL: https://encasa-5258f.web.app. Se desplegó únicamente Hosting al proyecto existente encasa-5258f, sin cambiar el plan ni activar facturación. Verificados Google Sign-In y lectura de Casa Familia Torres (6 productos), manifest y service worker HTTP 200, CSP/nosniff/Referrer-Policy/Permissions-Policy/HSTS y sw.js con Cache-Control no-cache. Falta instalar y probar modo avión/reconexión desde iPhone y Windows reales.
-
-### Catálogo de sugerencias ampliado
-
-El catálogo incluye 150 productos comunes de almacén, lácteos, verdulería, carnicería, congelados, bebidas, limpieza e higiene. En Lista de compras → Agregar ítem, escribir parte del nombre muestra hasta seis sugerencias y al elegir una completa categoría y unidad. Incluye arvejas, atún y choclo; tolera tildes y algunos alias como choclos/maíz y muzzarella. Se puede seguir escribiendo un producto que no esté en el catálogo. Las sugerencias no cargan productos automáticamente en el inventario ni requieren lecturas nuevas de Firebase.
-
-Para probar: escribir arv, atun o choclos y elegir una sugerencia; verificar nombre, categoría y unidad antes de agregar. En una PWA que ya estaba abierta, aceptar Actualizar app cuando aparezca (primero sincronizar pendientes). Los tests verifican 150 claves/nombres únicos, datos válidos y que cada producto se encuentre por su nombre.
+[Guía familiar](docs/guia-familiar.md) · [Desarrollo y configuración](docs/desarrollo.md) · [Seguridad](SECURITY.md)
