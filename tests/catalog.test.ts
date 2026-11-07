@@ -4,6 +4,7 @@ import {
   addCatalogProducts,
   productCatalog,
   starterKeys,
+  normalizeProductName,
 } from "../src/services/productCatalog.ts";
 import { emptyHousehold } from "../src/services/cloudState.ts";
 import { validateProduct } from "../src/services/stock.ts";
@@ -43,6 +44,12 @@ test("un básico renombrado conserva su identidad y no se sobrescribe al repetir
   assert.equal(addCatalogProducts(state, ["arroz"], "later"), state);
 });
 test("todo el catálogo es válido y una selección desconocida se rechaza sin cambios parciales", () => {
+  assert.equal(productCatalog.length, 150);
+  assert.equal(new Set(productCatalog.map((p) => p.key)).size, 150);
+  assert.equal(
+    new Set(productCatalog.map((p) => normalizeProductName(p.name))).size,
+    150,
+  );
   const state = emptyHousehold();
   const all = addCatalogProducts(
     state,
