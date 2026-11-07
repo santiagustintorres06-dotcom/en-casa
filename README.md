@@ -6,8 +6,8 @@ Inventario del hogar y lista de compras, con modo local sin cuentas y conexión 
 
 - Etapa 1: inventario CRUD, categorías, cantidades, unidades, mínimos, búsqueda y filtros.
 - Etapa 2: lista por categorías, checks, cantidades editables, manuales y reposición al terminar.
-- Etapa 3: código de Google Sign-In, hogares, invitaciones, roles, sincronización, reglas y emuladores. El ingreso y la lectura del hogar real están verificados; resta publicar la web y probar entre dispositivos.
-- Etapa 4 implementada: manifest, íconos, service worker, apertura offline y cola durable con reenvío idempotente. Pendiente instalación en equipos reales y publicación en Hosting.
+- Etapa 3: código de Google Sign-In, hogares, invitaciones, roles, sincronización, reglas y emuladores. El ingreso y la lectura del hogar real están verificados; web publicada; resta probar entre dispositivos.
+- Etapa 4 implementada: manifest, íconos, service worker, apertura offline y cola durable con reenvío idempotente. Publicada en Firebase Hosting. Pendiente instalación en equipos reales.
 
 El modo local sigue funcionando sin variables de entorno. No se sube el inventario local automáticamente al iniciar sesión. El modo compartido conserva cambios optimistas en una cola local durable y los envía al volver la conexión con la app abierta. Requiere una primera apertura online del hogar.
 
@@ -148,7 +148,7 @@ Vercel puede servir el build Vite (`npm run build`, salida `dist`), pero requier
 
 ## Instalar y probar la PWA
 
-La instalación requiere la web publicada con HTTPS (localhost solo sirve para pruebas en esa misma PC). Todavía no se desplegó Hosting.
+La instalación requiere la web publicada con HTTPS (localhost solo sirve para pruebas en esa misma PC). Publicada en https://encasa-5258f.web.app.
 
 - **iPhone:** abrir la URL publicada en Safari → Compartir → Agregar a pantalla de inicio → Agregar. Abrir el ícono e ingresar con Google si Safari no comparte la sesión con la app instalada.
 - **Windows:** abrir la URL en Chrome/Edge → ícono de instalación en la barra o menú → Instalar En casa. También aparece un botón en la app cuando el navegador ofrece instalación.
@@ -178,7 +178,7 @@ Verificado localmente: build y manifest, 28 tests unitarios, 17 tests con reglas
 - API key limitada a seis referrers: ambos dominios HTTPS de Firebase y localhost/127.0.0.1 en los puertos 5173 y 4173. Restringida a Firestore, App Check, Installations, Identity Toolkit y Token Service. Google indica hasta cinco minutos de propagación.
 - El cliente usa `ReCaptchaEnterpriseProvider` porque la consola ya no permite nuevas configuraciones de reCAPTCHA Classic. Sin facturación, Fraud Defense usa Essentials: cuota gratuita y rechazo al excederla, sin cobros. [Condiciones y cuotas oficiales](https://docs.cloud.google.com/recaptcha/docs/billing-information).
 
-El primer login Google y la lectura del hogar real quedaron verificados. Pendiente: probar operaciones entre dos cuentas desde Safari/Chrome/Edge. App Check no sustituye las reglas de Firestore. No se cambiaron reglas a modo abierto ni se publicaron datos del inventario local automáticamente. La PWA está implementada; Hosting todavía no está desplegado.
+El primer login Google y la lectura del hogar real quedaron verificados. Pendiente: probar operaciones entre dos cuentas desde Safari/Chrome/Edge. App Check no sustituye las reglas de Firestore. No se cambiaron reglas a modo abierto ni se publicaron datos del inventario local automáticamente. La PWA está publicada en Firebase Hosting.
 
 ### Corrección de la primera conexión al hogar
 
@@ -199,3 +199,7 @@ La app detecta productos existentes por identidad de catálogo o por nombre norm
 Prueba: abrir el catálogo, buscar “jabon”, confirmar que encuentra “Jabón”, cargar algunos básicos y recargar. Volver a abrirlo debe mostrar esos productos bloqueados y sin nuevas selecciones para los cuatro básicos ya existentes. Los tests cubren carga, faltantes automáticos, repetición, tildes/espacios, producto renombrado y claves inválidas.
 
 Verificado en Firebase real: se cargaron jabón, desodorante y fideos a Casa Familia Torres, con stock 0; el arroz existente conservó su cantidad y unidad. La carga persistió tras recargar. La prueba de sincronización entre dos cuentas/dispositivos sigue pendiente.
+
+## Publicación del 7 de noviembre de 2026
+
+URL: https://encasa-5258f.web.app. Se desplegó únicamente Hosting al proyecto existente encasa-5258f, sin cambiar el plan ni activar facturación. Verificados Google Sign-In y lectura de Casa Familia Torres (6 productos), manifest y service worker HTTP 200, CSP/nosniff/Referrer-Policy/Permissions-Policy/HSTS y sw.js con Cache-Control no-cache. Falta instalar y probar modo avión/reconexión desde iPhone y Windows reales.
