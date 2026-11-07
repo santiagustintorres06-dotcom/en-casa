@@ -18,7 +18,13 @@ Desarrollada con una estructura organizada y patrones establecidos, mediante asi
 - **Android:** abrir en Chrome → menú ⋮ → Instalar aplicación.
 - **iPhone:** abrir en Safari → Compartir → Agregar a pantalla de inicio.
 
-Para compartir el hogar, ingresar con Google y unirse con el código de invitación de un integrante.
+## Cómo usarla
+
+1. **Abrí la app.** Podés usarla sin cuenta en ese dispositivo. Para compartir los datos, entrá a **Ajustes del hogar → Ingresar con Google** y creá un hogar o unite con el código que te pase su propietario.
+2. **Cargá lo que tenés.** En **Inventario**, tocá **Agregar producto** o **Cargar básicos**. Ajustá la cantidad real y el stock mínimo; los básicos empiezan en cero.
+3. **Revisá los faltantes.** Cuando un producto llega al mínimo, aparece en **Lista de compras**. También podés tocar **Se acabó** o agregar algo a mano; al escribir aparecen sugerencias.
+4. **Hacé la compra.** Indicá cuánto comprás y tildá lo que ponés en el changuito. Al terminar, tocá **Terminé la compra** y confirmá: recién ahí se suma al inventario.
+5. **Sin señal.** Abrí el hogar una vez con Internet antes de salir. Los cambios quedan guardados en el celular; volvé a abrir la app con conexión para sincronizarlos.
 
 ## Tecnologías
 
