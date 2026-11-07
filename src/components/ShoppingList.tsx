@@ -3,6 +3,8 @@ import { Check, Plus, ShoppingBasket, Trash2, X } from "lucide-react";
 import { categories, units } from "../types/product";
 import type { ManualItem, ShoppingRow } from "../types/shopping";
 import { validateProduct } from "../services/stock";
+import { ProductNameInput } from "./ProductNameInput";
+import type { ProductInput } from "../types/product";
 
 type Props = {
   rows: ShoppingRow[];
@@ -83,6 +85,9 @@ function ManualForm({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState("");
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<ProductInput["category"]>("Almacén");
+  const [unit, setUnit] = useState<ProductInput["unit"]>("un");
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -115,19 +120,24 @@ function ManualForm({
             <X />
           </button>
         </div>
-        <label>
-          Nombre
-          <input
-            name="name"
-            required
-            autoFocus
-            maxLength={80}
-            placeholder="Ej.: Bolsas de residuos"
-          />
-        </label>
+        <ProductNameInput
+          value={name}
+          onChange={setName}
+          onPick={(p) => {
+            setName(p.name);
+            setCategory(p.category);
+            setUnit(p.unit);
+          }}
+        />
         <label>
           Categoría
-          <select name="category">
+          <select
+            name="category"
+            value={category}
+            onChange={(e) =>
+              setCategory(e.target.value as ProductInput["category"])
+            }
+          >
             {categories.map((c) => (
               <option key={c}>{c}</option>
             ))}
@@ -149,7 +159,11 @@ function ManualForm({
           </label>
           <label>
             Unidad
-            <select name="unit">
+            <select
+              name="unit"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value as ProductInput["unit"])}
+            >
               {units.map((u) => (
                 <option key={u}>{u}</option>
               ))}
