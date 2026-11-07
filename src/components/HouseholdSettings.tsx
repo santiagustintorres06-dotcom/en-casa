@@ -178,10 +178,9 @@ export function HouseholdSettings({
               onClick={() =>
                 setConfirm({
                   title: "¿Cerramos la sesión?",
-                  description:
-                    "Se van a borrar los datos de esta app guardados en este navegador, incluido el inventario local. El hogar compartido sigue en Firebase. Exportá un respaldo antes si querés conservar la copia local.",
+                  description: `Se borrará la copia de este navegador. ${cloud.queuedCount ? `Hay ${cloud.queuedCount} cambios sin enviar: se perderán si salís. Exportalos antes.` : "El hogar compartido sigue en Firebase."}`,
                   button: "Cerrar sesión",
-                  action: cloud.logout,
+                  action: () => cloud.logout(true),
                 })
               }
             >
@@ -390,6 +389,45 @@ export function HouseholdSettings({
           )}
         </>
       )}
+      {cloud.queuedCount > 0 && (
+        <div className="stage-note">
+          <h3>{cloud.queuedCount} cambios pendientes</h3>
+          <p>
+            {cloud.syncing
+              ? "Enviando al hogar…"
+              : "Quedan guardados en este dispositivo hasta sincronizar."}
+          </p>
+          <button className="secondary" onClick={cloud.exportPending}>
+            Exportar pendientes
+          </button>
+          <button
+            className="secondary"
+            disabled={cloud.syncing}
+            onClick={() =>
+              setConfirm({
+                title: "¿Descartamos los cambios pendientes?",
+                description:
+                  "Se eliminarán los cambios sin enviar de este dispositivo. Exportalos antes para conservarlos. Se recuperará la última copia confirmada del hogar.",
+                button: "Descartar pendientes",
+                action: cloud.discardPending,
+              })
+            }
+          >
+            Descartar pendientes
+          </button>
+        </div>
+      )}
+      <h3>Instalar En casa</h3>
+      <p>
+        En iPhone: abrí la web en Safari, tocá Compartir y elegí “Agregar a
+        pantalla de inicio”. En Windows: abrila en Chrome o Edge y elegí
+        “Instalar” en el menú del navegador.
+      </p>
+      <p>
+        Antes de salir, abrí tu hogar con Internet una vez y esperá a que no
+        queden cambios pendientes. Para sincronizar después, volvé a abrir la
+        app con conexión.
+      </p>
       <h3>Respaldo de tus datos</h3>
       <p>
         Descargá una copia del inventario y la lista. La restauración desde la
@@ -401,7 +439,7 @@ export function HouseholdSettings({
       </button>
       <p className="home-note">
         {cloud.id
-          ? "La edición compartida necesita conexión en esta etapa. La PWA y el guardado offline llegan en la próxima."
+          ? "Podés editar sin conexión después de abrir el hogar una vez online. Volvé a abrir la app con Internet para enviar los cambios."
           : "Sin un hogar conectado, tus datos quedan en este navegador."}
       </p>
       {confirm && <ConfirmAction {...confirm} close={() => setConfirm(null)} />}

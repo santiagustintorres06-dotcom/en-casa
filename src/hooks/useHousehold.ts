@@ -143,6 +143,9 @@ export function useHousehold() {
     if (!runtime || !id || !user) {
       setHome(null);
       setMembers([]);
+      setQueuedCount(0);
+      setSyncing(false);
+      conflict.current = false;
       setReady(false);
       current.current = { state: emptyHousehold(), revision: -1 };
       confirmed.current = current.current;

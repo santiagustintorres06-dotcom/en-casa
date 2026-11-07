@@ -19,6 +19,7 @@ import { isLowStock } from "./services/stock";
 import { ProductForm } from "./components/ProductForm";
 import { ProductCatalog } from "./components/ProductCatalog";
 import { ShoppingList } from "./components/ShoppingList";
+import { PwaStatus } from "./components/PwaStatus";
 import { HouseholdSettings } from "./components/HouseholdSettings";
 import { useHousehold, type HouseholdController } from "./hooks/useHousehold";
 const icons: Record<string, string> = {
@@ -97,7 +98,11 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
                   ? "Sin acceso al hogar"
                   : !cloud.online
                     ? "Sin conexión"
-                    : "Hogar sincronizado"
+                    : cloud.syncing
+                      ? "Sincronizando…"
+                      : cloud.queuedCount
+                        ? `${cloud.queuedCount} cambios pendientes`
+                        : "Hogar sincronizado"
             : "Guardado en este dispositivo"}
         </span>
       </header>
@@ -140,6 +145,7 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
           </div>
         </aside>
         <main>
+          <PwaStatus pendingChanges={cloud.queuedCount} />
           <div className="eyebrow">MENOS VUELTAS, MÁS EN CASA</div>
           <div className="page-heading">
             <div>
@@ -192,8 +198,8 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
           </p>
           {cloud.id && !cloud.online && (
             <p role="status" className="stage-note">
-              Sin conexión. Podés consultar lo cargado; para guardar cambios
-              compartidos necesitás Internet en esta etapa.
+              Sin conexión. Tus cambios quedan en este dispositivo y se envían
+              cuando vuelva la conexión y abras la app.
             </p>
           )}
           {cloud.id && !cloud.ready && tab !== "Ajustes del hogar" && (
