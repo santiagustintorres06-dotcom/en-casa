@@ -19,7 +19,7 @@ import { isLowStock } from "./services/stock";
 import { ProductForm } from "./components/ProductForm";
 import { ProductCatalog } from "./components/ProductCatalog";
 import { ShoppingList } from "./components/ShoppingList";
-import { PwaStatus } from "./components/PwaStatus";
+import { PwaStatus, usePwa } from "./components/PwaStatus";
 import { HouseholdSettings } from "./components/HouseholdSettings";
 import { useHousehold, type HouseholdController } from "./hooks/useHousehold";
 const icons: Record<string, string> = {
@@ -37,9 +37,16 @@ const fmt = (n: number) =>
   n.toLocaleString("es-AR", { maximumFractionDigits: 3 });
 export default function App() {
   const cloud = useHousehold();
-  return <InventoryApp key={cloud.id || "local"} cloud={cloud} />;
+  const pwa = usePwa();
+  return <InventoryApp key={cloud.id || "local"} cloud={cloud} pwa={pwa} />;
 }
-function InventoryApp({ cloud }: { cloud: HouseholdController }) {
+function InventoryApp({
+  cloud,
+  pwa,
+}: {
+  cloud: HouseholdController;
+  pwa: ReturnType<typeof usePwa>;
+}) {
   const inv = useInventory(cloud.port);
   const [tab, setTab] = useState("Inventario");
   const [search, setSearch] = useState("");
@@ -145,7 +152,11 @@ function InventoryApp({ cloud }: { cloud: HouseholdController }) {
           </div>
         </aside>
         <main>
-          <PwaStatus pendingChanges={cloud.queuedCount} />
+          <PwaStatus
+            pwa={pwa}
+            pendingChanges={cloud.queuedCount}
+            showCheck={tab === "Ajustes del hogar"}
+          />
           <div className="eyebrow">MENOS VUELTAS, MÁS EN CASA</div>
           <div className="page-heading">
             <div>
