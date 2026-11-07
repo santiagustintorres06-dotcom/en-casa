@@ -6,10 +6,10 @@ Inventario del hogar y lista de compras, con modo local sin cuentas y conexión 
 
 - Etapa 1: inventario CRUD, categorías, cantidades, unidades, mínimos, búsqueda y filtros.
 - Etapa 2: lista por categorías, checks, cantidades editables, manuales y reposición al terminar.
-- Etapa 3: código de Google Sign-In, hogares, invitaciones, roles, sincronización, reglas y emuladores. El proyecto encasa-5258f está configurado; resta verificar el ingreso real y publicar la web.
-- Etapa 4 pendiente: PWA instalable, service worker, apertura offline y cola de escrituras compartidas.
+- Etapa 3: código de Google Sign-In, hogares, invitaciones, roles, sincronización, reglas y emuladores. El ingreso y la lectura del hogar real están verificados; resta publicar la web y probar entre dispositivos.
+- Etapa 4 implementada: manifest, íconos, service worker, apertura offline y cola durable con reenvío idempotente. Pendiente instalación en equipos reales y publicación en Hosting.
 
-El modo local sigue funcionando sin variables de entorno. No se sube el inventario local automáticamente al iniciar sesión. El modo compartido de esta etapa necesita Internet para escribir; muestra cambios optimistas mientras el servidor confirma y revierte si falla.
+El modo local sigue funcionando sin variables de entorno. No se sube el inventario local automáticamente al iniciar sesión. El modo compartido conserva cambios optimistas en una cola local durable y los envía al volver la conexión con la app abierta. Requiere una primera apertura online del hogar.
 
 ## Ejecutar y verificar
 
@@ -96,7 +96,7 @@ Agregar Arroz con cantidad 2 kg y mínimo 1. Restar uno: aparece como faltante. 
 2. En Ajustes, importar el inventario local si el hogar está vacío (hasta 150 productos/ítems). Los checks se reinician; no se importan recibos de compras anteriores.
 3. Copiar el código de invitación y unirse desde otra cuenta y otro perfil/dispositivo.
 4. Modificar un producto desde un dispositivo: el otro debe recibirlo en tiempo real. Comprar siete unidades debe reflejarse una sola vez.
-5. Provocar ediciones simultáneas: una revisión antigua no debe sobrescribir el cambio de otro integrante; se pide repetir el cambio sobre la vista actualizada.
+5. Provocar ediciones simultáneas: una revisión antigua no debe sobrescribir el cambio de otro integrante. Los movimientos de cantidad se suman; los conflictos de nombre/unidad/borrado se conservan como pendientes para exportar o descartar desde Ajustes.
 6. Como member, comprobar que no aparecen controles de owner; los tests verifican que tampoco se pueden invocar por fuera de la UI.
 7. Como owner, renovar código, probar que el anterior no sirve, expulsar un member y comprobar que pierde acceso. La expulsión también rota el código.
 8. Exportar un respaldo antes de cerrar sesión. Logout borra los datos de esta app en ese navegador, incluido su inventario local; el hogar permanece en Firebase.
@@ -146,7 +146,27 @@ npx firebase deploy --only hosting,firestore:rules --project TU_PROJECT_ID
 
 Vercel puede servir el build Vite (`npm run build`, salida `dist`), pero requiere configurar allí variables, rewrite SPA y headers equivalentes a `firebase.json`. No se configuró Vercel en esta etapa.
 
-La instalación en pantalla de inicio de iPhone y como app en Windows se documentará y verificará con el manifest y el service worker de la etapa 4; esta versión todavía no promete instalación ni apertura offline.
+## Instalar y probar la PWA
+
+La instalación requiere la web publicada con HTTPS (localhost solo sirve para pruebas en esa misma PC). Todavía no se desplegó Hosting.
+
+- **iPhone:** abrir la URL publicada en Safari → Compartir → Agregar a pantalla de inicio → Agregar. Abrir el ícono e ingresar con Google si Safari no comparte la sesión con la app instalada.
+- **Windows:** abrir la URL en Chrome/Edge → ícono de instalación en la barra o menú → Instalar En casa. También aparece un botón en la app cuando el navegador ofrece instalación.
+- Abrir el hogar con Internet y esperar la sincronización antes de salir. El service worker descarga solo archivos estáticos propios; no guarda respuestas de Auth, Firestore ni App Check.
+- Activar modo avión en el teléfono, cerrar y reabrir la app. Modificar stock, agregar un manual y terminar una compra de prueba. Recargar: los cambios deben seguir ahí. Desactivar modo avión y abrir la app: esperar que no haya pendientes y verificar desde otro dispositivo que el stock se sumó una vez.
+- Probar dos dispositivos desconectados: una reposición remota más un consumo local deben conservar ambos movimientos. Si cambia la unidad o hay conflictos de texto/borrado, exportar pendientes en Ajustes antes de descartarlos.
+- Logout pide confirmar el borrado de la copia local y avisa si hay pendientes. No cerrar sesión ni limpiar el almacenamiento del navegador antes de sincronizar/exportar.
+- Nueva versión: la app ofrece Actualizar app y bloquea el botón si hay cambios pendientes. Cerrar formularios antes de actualizar.
+
+No se promete sincronización con la app cerrada: Safari/iOS puede suspenderla. La cola se procesa en primer plano al abrir o recuperar conexión. El navegador puede desalojar almacenamiento por falta de espacio; usar respaldos.
+
+### Implementación offline
+
+Firestore mantiene caché en memoria. La copia confirmada del hogar se guarda por UID en localStorage, junto con un registro independiente por operación pendiente. Cada registro conserva el estado anterior/posterior y un UUID. Al reconectar, se aplica contra la última revisión del servidor y se guarda un recibo o_sync-{uuid} en la misma transacción que stock/lista. Reintentar después de un cierre no suma de nuevo. Web Locks serializa el envío entre pestañas cuando está disponible; las revisiones y recibos en Firestore protegen entre dispositivos.
+
+Cantidad se reconcilia como diferencia, con límites 0–100000; nombre/unidad/borrado incompatibles detienen el envío sin eliminar los pendientes. Desde Ajustes se pueden exportar o descartar (con confirmación). Los datos offline no están cifrados y un integrante expulsado puede conservar su copia hasta conectarse; el servidor siempre vuelve a validar membresía.
+
+Verificado localmente: build y manifest, 28 tests unitarios, 17 tests con reglas/emulador (incluye reenvío sin duplicar una compra de 7), sugerencias al escribir d y autocompletado de categoría/unidad. En el navegador se cerró el servidor de preview y la app siguió abriendo al recargar gracias al service worker. No equivale a una prueba en Safari/iPhone real.
 
 ## Configuración realizada el 6 de noviembre de 2026
 
@@ -158,7 +178,7 @@ La instalación en pantalla de inicio de iPhone y como app en Windows se documen
 - API key limitada a seis referrers: ambos dominios HTTPS de Firebase y localhost/127.0.0.1 en los puertos 5173 y 4173. Restringida a Firestore, App Check, Installations, Identity Toolkit y Token Service. Google indica hasta cinco minutos de propagación.
 - El cliente usa `ReCaptchaEnterpriseProvider` porque la consola ya no permite nuevas configuraciones de reCAPTCHA Classic. Sin facturación, Fraud Defense usa Essentials: cuota gratuita y rechazo al excederla, sin cobros. [Condiciones y cuotas oficiales](https://docs.cloud.google.com/recaptcha/docs/billing-information).
 
-El primer login Google y la lectura del hogar real quedaron verificados. Pendiente: probar operaciones entre dos cuentas desde Safari/Chrome/Edge. App Check no sustituye las reglas de Firestore. No se cambiaron reglas a modo abierto ni se publicaron datos del inventario local automáticamente. No se desplegó Hosting ni se completó aún la PWA.
+El primer login Google y la lectura del hogar real quedaron verificados. Pendiente: probar operaciones entre dos cuentas desde Safari/Chrome/Edge. App Check no sustituye las reglas de Firestore. No se cambiaron reglas a modo abierto ni se publicaron datos del inventario local automáticamente. La PWA está implementada; Hosting todavía no está desplegado.
 
 ### Corrección de la primera conexión al hogar
 
