@@ -13,7 +13,7 @@
     "format": "prettier --write src tests *.json *.ts *.html README.md SECURITY.md"
   },
   "dependencies": {
-    "firebase": "^13.2.0",
+    "firebase": "^13.4.0",
     "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
